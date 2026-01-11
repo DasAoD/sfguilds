@@ -19,6 +19,7 @@ foreach ($guilds as $gg) {
 		<th>Gilde</th>
 		<?php if ($showTag): ?><th>Tag</th><?php endif; ?>
 		<th>Aktiv</th>
+		<th>Stand</th>
 		</tr>
 	</thead>
 
@@ -44,8 +45,22 @@ foreach ($guilds as $gg) {
   </a>
 </td>
 <?php if ($showTag): ?><td><?= e((string)($g['tag'] ?? '')) ?></td><?php endif; ?>
-<td><?= (int)($g['members_active'] ?? 0) ?></td>
+	<?php
+$lastImport = (string)($g['last_import_at'] ?? '');
+$lastImportText = '—';
 
+if ($lastImport !== '') {
+    try {
+        $dt = new DateTime($lastImport);
+        $dt->setTimezone(new DateTimeZone('Europe/Berlin'));
+        $lastImportText = $dt->format('d.m.Y'); // oder 'd.m.Y H:i' wenn du Uhrzeit willst
+    } catch (Throwable $e) {
+        $lastImportText = $lastImport; // Fallback, falls Format mal komisch ist
+    }
+}
+?>
+<td><?= (int)($g['members_active'] ?? 0) ?></td>
+<td><?= e($lastImportText) ?></td>
           </tr>
         <?php endforeach; ?>
       </tbody>
