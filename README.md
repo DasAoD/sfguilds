@@ -83,3 +83,5 @@ Kleines, schnelles PHP-Projekt zum Verwalten und Anzeigen von Shakes & Fidget Gi
     │   ├── incoming
     │   └── processing
     └── sfguilds.sqlite
+```
+Wichtig: DocumentRoot zeigt auf /var/www/sfguilds/public.
