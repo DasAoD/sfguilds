@@ -1,0 +1,18 @@
+# Abhängigkeiten
+node_modules/
+package-lock.json
+package.json
+
+# Tool-Konfigurationen
+.prettierrc
+
+# Betriebssystem-Dateien
+Thumbs.db
+.DS_Store
+
+# Datenbanken
+public/uploads/crest/*.webp
+storage/*.sqlite
+storage/import/archive/*.csv
+storage/import/import.lock
+storage/import/import.log
