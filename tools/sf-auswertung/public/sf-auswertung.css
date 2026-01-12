@@ -7,9 +7,9 @@
 }
 
 .sf-topbar{
-  border-bottom: 1px solid rgba(0,0,0,.08);
-  background: rgba(255,255,255,.9);
-  backdrop-filter: blur(6px);
+  border-bottom: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .sf-topbar-row{
@@ -43,11 +43,14 @@
   padding: 8px 12px;
   border-radius: 10px;
   text-decoration: none;
-  border: 1px solid rgba(0,0,0,.10);
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.04);
 }
 
 .sf-navlink.is-active{
   font-weight: 700;
+  border-color: rgba(255,255,255,.35);
+  background: rgba(255,255,255,.10);
 }
 
 .sf-main{
@@ -55,10 +58,11 @@
 }
 
 .sf-card{
-  border: 1px solid rgba(0,0,0,.10);
+  border: 1px solid rgba(255,255,255,.10);
   border-radius: 14px;
-  background: #fff;
+  background: rgba(0,0,0,.35);
   padding: 16px;
+  backdrop-filter: blur(6px);
 }
 
 .sf-card + .sf-card{
@@ -107,15 +111,17 @@
   display:inline-block;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(0,0,0,.15);
+  border: 1px solid rgba(255,255,255,.18);
   text-decoration: none;
   cursor: pointer;
   font-size: 14px;
-  background: #f7f7f7;
+  background: rgba(255,255,255,.04);
 }
 
 .sf-btn.primary{
   font-weight: 700;
+  border-color: rgba(255,255,255,.35);
+  background: rgba(255,255,255,.10);
 }
 
 .sf-msg-ok{
@@ -145,7 +151,7 @@
 }
 
 .sf-table th, .sf-table td{
-  border-bottom: 1px solid rgba(0,0,0,.08);
+  border-bottom: 1px solid rgba(255,255,255,.08);
   padding: 10px 8px;
   font-size: 14px;
 }
