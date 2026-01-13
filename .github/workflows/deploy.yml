@@ -1,0 +1,54 @@
+name: Deploy to Webserver
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install rsync
+        run: |
+          apt-get update
+          apt-get install -y rsync
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${{ secrets.DEPLOY_PORT }}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy via rsync
+        run: |
+          rsync -az --delete \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            --exclude ".env" \
+            --exclude "storage/*.sqlite" \
+            --exclude "storage/uploads/" \
+            -e "ssh -p ${{ secrets.DEPLOY_PORT }}" \
+            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/"
+
+      - name: Post-deploy (optional)
+        run: |
+          ssh -p "${{ secrets.DEPLOY_PORT }}" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" <<'EOF'
+          set -e
+          cd "${{ secrets.DEPLOY_PATH }}"
+
+          # Optional: Composer, falls PHP-Projekt mit composer.json
+          if [ -f composer.json ]; then
+            composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+          fi
+
+          # Optional: Rechte für typische Upload-/Cache-Verzeichnisse
+          if [ -d storage ]; then
+            chgrp -R www-data storage || true
+            chmod -R g+rwX storage || true
+          fi
+          EOF
