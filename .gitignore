@@ -28,5 +28,4 @@ storage/import/import.lock
 storage/import/import.log
 public/uploads/
 public/uploads/crest/*.webp
-
-git-push.bat
+storage/allow_setup
