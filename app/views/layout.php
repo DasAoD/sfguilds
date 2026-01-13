@@ -15,6 +15,7 @@ $title = $title ?? "S&F Guilds"; ?>
 				<nav class="nav">
 					<a class="btn" href="/">Home</a>
 					<?php if (isAdmin()): ?>
+					<a href="/sf-auswertung/">SF Auswertung</a>
 					<a class="btn" href="/admin/">Admin</a>
 					<a class="btn" href="<?= e(url("/admin/logout.php")) ?>">Logout</a>
 					<?php else: ?>
