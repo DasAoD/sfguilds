@@ -22,6 +22,7 @@ Thumbs.db
 storage/uploads/
 storage/cache/
 storage/logs/
+storage/import/
 storage/import/archive/*.csv
 storage/import/import.lock
 storage/import/import.log
