@@ -30,7 +30,7 @@
 					<th>Gilde</th>
 					<?php if ($showTag): ?><th>Tag</th><?php endif; ?>
 					<th>Aktiv</th>
-					<th>Stand</th>
+					<th>Datenstand</th>
 				</tr>
 			</thead>
 			
