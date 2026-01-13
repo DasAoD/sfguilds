@@ -627,8 +627,7 @@
 					? "selected"
 					: "" ?>>
 					<?= h($g["server"]) ?> – <?=
-						h($g["name"])
-						!empty($g["tag"]) ? " [" . h($g["tag"]) . "]" : ""
+						h($g["name"]) . (!empty($g["tag"]) ? " [" . h($g["tag"]) . "]" : "")
 					?>
 				</option>
 				<?php endforeach; ?>
