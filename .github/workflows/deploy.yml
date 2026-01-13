@@ -1,8 +1,12 @@
-name: Deploy to Webserver
+name: Deploy sfguilds to Webserver
 
 on:
   push:
     branches: ["main"]
+
+concurrency:
+  group: deploy-sfguilds
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -26,29 +30,33 @@ jobs:
 
       - name: Deploy via rsync
         run: |
-          rsync -az --delete \
+          rsync -az --delete --delay-updates --delete-after \
             --exclude ".git/" \
             --exclude ".github/" \
             --exclude ".env" \
             --exclude "storage/*.sqlite" \
+            --exclude "storage/*.db" \
             --exclude "storage/uploads/" \
+            --exclude "storage/cache/" \
+            --exclude "storage/logs/" \
+            --exclude "public/uploads/" \
             -e "ssh -p ${{ secrets.DEPLOY_PORT }}" \
             ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/"
 
-      - name: Post-deploy (optional)
+      - name: Post-deploy permissions
         run: |
           ssh -p "${{ secrets.DEPLOY_PORT }}" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" <<'EOF'
           set -e
           cd "${{ secrets.DEPLOY_PATH }}"
 
-          # Optional: Composer, falls PHP-Projekt mit composer.json
-          if [ -f composer.json ]; then
-            composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
-          fi
-
-          # Optional: Rechte für typische Upload-/Cache-Verzeichnisse
+          # storage muss für PHP schreibbar sein, wenn du SQLite/Uploads/Logs nutzt
           if [ -d storage ]; then
             chgrp -R www-data storage || true
             chmod -R g+rwX storage || true
+          fi
+
+          if [ -d public/uploads ]; then
+            chgrp -R www-data public/uploads || true
+            chmod -R g+rwX public/uploads || true
           fi
           EOF
