@@ -1,12 +1,31 @@
+# Secrets / lokale Config
+.env
+.env.*
+
+# NodeJS/Prettier
 node_modules/
 package-lock.json
 package.json
 .prettierrc
-Thumbs.db
+
+# OS/IDE
 .DS_Store
-public/uploads/crest/*.webp
-storage/*.sqlite
+Thumbs.db
+.vscode/
+.idea/
+
+# SQLite / runtime data
+/storage/*.sqlite
+/storage/*.db
+
+# Uploads / cache / logs (falls vorhanden)
+storage/uploads/
+storage/cache/
+storage/logs/
 storage/import/archive/*.csv
 storage/import/import.lock
 storage/import/import.log
+public/uploads/
+public/uploads/crest/*.webp
+
 git-push.bat
