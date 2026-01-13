@@ -6,6 +6,11 @@ $ROOT = dirname(__DIR__, 2);
 require $ROOT . '/app/bootstrap.php';
 require $ROOT . '/app/tools/sf-auswertung/module.php';
 
+if (!isAdmin()) {
+  header('Location: ' . url("/admin/login.php?next=" . rawurlencode($_SERVER["REQUEST_URI"] ?? "/sf-auswertung/")));
+  exit;
+}
+
 // Import handling
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $res = sf_auswertung_import_battle($_POST['date'] ?? '', $_POST['time'] ?? '', $_POST['text'] ?? '');
