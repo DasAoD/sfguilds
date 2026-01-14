@@ -16,9 +16,11 @@ $guilds = sf_eval_guilds();
 
 $flash = null;
 $error = null;
+$prefGuildId = (int)($_GET['guild_id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $guildId = (int)($_POST['guild_id'] ?? 0);
+    $prefGuildId = $guildId;
     $date = trim((string)($_POST['date'] ?? ''));
     $time = trim((string)($_POST['time'] ?? ''));
     $text = (string)($_POST['text'] ?? '');
@@ -29,11 +31,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!preg_match('/^\d{2}:\d{2}$/', $time)) throw new RuntimeException('Uhrzeit bitte als HH:MM.');
         if (trim($text) === '') throw new RuntimeException('Textfeld ist leer.');
 
-        $res = sf_eval_import($guildId, $date, $time, $text);
+$res = sf_eval_import($guildId, $date, $time, $text);
 
-        $flash = $res['inserted']
-            ? "Import OK: " . ($res['type'] === 'attack' ? 'Angriff' : 'Verteidigung') . " gegen „{$res['opponent']}“ ({$res['players']} Einträge)."
-            : "Schon vorhanden (Duplikat erkannt): " . ($res['type'] === 'attack' ? 'Angriff' : 'Verteidigung') . " gegen „{$res['opponent']}“.";
+// Bei Erfolg oder Duplikat: ab zum Report der gewählten Gilde
+$q = http_build_query([
+    'guild_id' => $guildId,
+    'import'   => $res['inserted'] ? 'ok' : 'dup',
+    'type'     => $res['type'],
+    'opponent' => $res['opponent'],
+    'players'  => (string)$res['players'],
+]);
+
+header('Location: ' . url('/sf-auswertung/report.php?' . $q));
+exit;
     } catch (Throwable $e) {
         $error = $e->getMessage();
     }
@@ -63,7 +73,7 @@ ob_start();
       <select name="guild_id" required>
         <option value="">– bitte wählen –</option>
         <?php foreach ($guilds as $g): ?>
-          <option value="<?= (int)$g['id'] ?>">
+          <option value="<?= (int)$g['id'] ?>" <?= ($prefGuildId === (int)$g['id']) ? 'selected' : '' ?>>
             <?= e($g['name']) ?> (<?= e($g['server']) ?>)
           </option>
         <?php endforeach; ?>
@@ -73,11 +83,11 @@ ob_start();
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
       <label>
         <div>Datum</div>
-        <input type="date" name="date" required>
+        <input type="date" name="date" required value="<?= e($_POST['date'] ?? '') ?>">
       </label>
       <label>
         <div>Uhrzeit</div>
-        <input type="time" name="time" required>
+        <input type="time" name="time" required value="<?= e($_POST['time'] ?? '') ?>">
       </label>
     </div>
   </div>
