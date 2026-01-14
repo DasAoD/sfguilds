@@ -27,6 +27,10 @@ ob_start();
 ?>
 <h1>SF Auswertung – Report</h1>
 
+<?php if (($_GET['import'] ?? '') === 'ok'): ?>
+  <div class="notice success">Import erfolgreich.</div>
+<?php endif; ?>
+
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
   <a class="btn" href="<?= e(url('/sf-auswertung/')) ?>">Import</a>
   <a class="btn" href="<?= e(url('/sf-auswertung/report.php')) ?>">Report</a>
