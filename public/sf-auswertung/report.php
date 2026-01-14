@@ -12,9 +12,6 @@ if (!isAdmin()) {
 }
 
 $title = 'SF Auswertung – Report';
-if ($guild) {
-    $title = $guild['server'] . ' – ' . $guild['name'] . ' – Report';
-}
 $guilds = sf_eval_guilds();
 
 $guildId = (int)($_GET['guild_id'] ?? 0);
@@ -26,13 +23,16 @@ if ($guildId > 0) {
     $st = db()->prepare("SELECT id, name, server, crest_file FROM guilds WHERE id = ?");
     $st->execute([$guildId]);
     $guild = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($guild) {
+      $title = $guild['server'] . ' – ' . $guild['name'] . ' (Report)';
+    }
 
     // Stats (Angriffe/Verteidigungen/letzter Import)
     $st = db()->prepare("
         SELECT
             SUM(CASE WHEN battle_type = 'attack'  THEN 1 ELSE 0 END) AS attacks,
             SUM(CASE WHEN battle_type = 'defense' THEN 1 ELSE 0 END) AS defenses,
-            MAX(battle_date || ' ' || battle_time) AS last_import
+            MAX(battle_date) AS last_import
         FROM sf_eval_battles
         WHERE guild_id = ?
     ");
@@ -66,15 +66,6 @@ if ($guildId > 0) {
 ob_start();
 ?>
 <h1><?= e($title) ?></h1>
-
-<?php
-$importFlag = (string)($_GET['import'] ?? '');
-$importType = (string)($_GET['type'] ?? '');
-$importOpponent = (string)($_GET['opponent'] ?? '');
-$importPlayers = (string)($_GET['players'] ?? '');
-
-$importTypeLabel = ($importType === 'attack') ? 'Angriff' : (($importType === 'defense') ? 'Verteidigung' : '');
-?>
 
 <?php
 $importFlag = (string)($_GET['import'] ?? '');
