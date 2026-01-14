@@ -15,6 +15,43 @@ $title = 'SF Auswertung – Report';
 $guilds = sf_eval_guilds();
 
 $guildId = (int)($_GET['guild_id'] ?? 0);
+$guild = null;
+$stats = ['attacks' => 0, 'defenses' => 0, 'last_import' => null];
+
+if ($guildId > 0) {
+    // Guild-Infos
+    $st = db()->prepare("SELECT id, name, server, crest_file FROM guilds WHERE id = ?");
+    $st->execute([$guildId]);
+    $guild = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    // Stats (Angriffe/Verteidigungen/letzter Import)
+    $st = db()->prepare("
+        SELECT
+            SUM(CASE WHEN battle_type = 'attack'  THEN 1 ELSE 0 END) AS attacks,
+            SUM(CASE WHEN battle_type = 'defense' THEN 1 ELSE 0 END) AS defenses,
+            MAX(battle_date || ' ' || battle_time) AS last_import
+        FROM sf_eval_battles
+        WHERE guild_id = ?
+    ");
+    $st->execute([$guildId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $stats['attacks'] = (int)($row['attacks'] ?? 0);
+    $stats['defenses'] = (int)($row['defenses'] ?? 0);
+    $stats['last_import'] = $row['last_import'] ?? null;
+}
+
+// schöner Zeitstempel (optional)
+$lastImportNice = null;
+if (!empty($stats['last_import'])) {
+    try {
+        $dt = new DateTime($stats['last_import']);
+        $lastImportNice = $dt->format('d.m.Y H:i');
+    } catch (Throwable $e) {
+        $lastImportNice = $stats['last_import'];
+    }
+}
+
 $attack = null;
 $defense = null;
 
@@ -62,6 +99,33 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
   <div class="notice warn" style="max-width: 900px;">
     <div><strong>Duplikat erkannt.</strong></div>
     <div><?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“ war bereits importiert.</div>
+  </div>
+<?php endif; ?>
+
+<?php if ($guild): ?>
+  <div style="display:flex; gap:22px; align-items:flex-start; margin: 16px 0 18px; max-width: 900px;">
+    <?php if (!empty($guild['crest_file'])): ?>
+      <div style="flex:0 0 auto;">
+        <img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>"
+             alt=""
+             style="max-width: 260px; height:auto; display:block;">
+      </div>
+    <?php endif; ?>
+
+    <div style="flex:1 1 auto;">
+      <h2 style="margin: 0 0 8px;"><?= e($guild['server']) ?> – <?= e($guild['name']) ?></h2>
+
+      <div style="opacity:.9; margin: 0 0 6px;">
+        <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
+        <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
+      </div>
+
+      <?php if ($lastImportNice): ?>
+        <div style="opacity:.75;">
+          Letzter Import: <?= e($lastImportNice) ?>
+        </div>
+      <?php endif; ?>
+    </div>
   </div>
 <?php endif; ?>
 
