@@ -51,7 +51,7 @@ exit;
 
 ob_start();
 ?>
-<h1>SF Auswertung</h1>
+<h2>SF Auswertung</h2>
 
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
   <?php $qid = ($prefGuildId > 0) ? ('?guild_id=' . $prefGuildId) : ''; ?>
