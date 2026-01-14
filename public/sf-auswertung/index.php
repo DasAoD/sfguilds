@@ -54,8 +54,9 @@ ob_start();
 <h1>SF Auswertung</h1>
 
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
-  <a class="btn" href="<?= e(url('/sf-auswertung/')) ?>">Import</a>
-  <a class="btn" href="<?= e(url('/sf-auswertung/report.php')) ?>">Report</a>
+  <?php $qid = ($prefGuildId > 0) ? ('?guild_id=' . $prefGuildId) : ''; ?>
+  <a class="btn" href="<?= e(url('/sf-auswertung/' . $qid)) ?>">Import</a>
+  <a class="btn" href="<?= e(url('/sf-auswertung/report.php' . $qid)) ?>">Report</a>
 </div>
 
 <?php if ($flash): ?>
