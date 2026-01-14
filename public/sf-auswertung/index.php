@@ -84,7 +84,9 @@ ob_start();
 
   <label style="display:block; margin-top: 12px;">
     <div>Post-Text (reinkopieren)</div>
+    <div style="max-width: 900px;">
     <textarea name="text" rows="18" required style="width:100%;"><?= e($_POST['text'] ?? '') ?></textarea>
+    </div>
   </label>
 
   <div style="margin-top: 12px;">
