@@ -97,14 +97,40 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
 <?php endif; ?>
 
 <?php if ($guild): ?>
-  <div style="display:flex; gap:22px; align-items:flex-start; margin: 16px 0 18px; max-width: 900px;">
+  <?php $qid = '?guild_id=' . $guildId; ?>
+
+  <div style="max-width: 900px; margin: 16px 0 18px;">
     <?php if (!empty($guild['crest_file'])): ?>
-      <div style="flex:0 0 auto;">
-        <img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>"
-             alt=""
-             style="max-width: 260px; height:auto; display:block;">
+      <img
+        src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>"
+        alt=""
+        style="max-width: 260px; height:auto; display:block;"
+      >
+    <?php endif; ?>
+
+    <div style="opacity:.9; margin-top: 10px;">
+      <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
+      <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
+    </div>
+
+    <?php if ($lastImportNice): ?>
+      <div style="opacity:.75; margin-top: 6px;">
+        Letzter Import: <?= e($lastImportNice) ?>
       </div>
     <?php endif; ?>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px;">
+      <a class="btn" href="<?= e(url('/sf-auswertung/' . $qid)) ?>">Import</a>
+      <a class="btn" href="<?= e(url('/sf-auswertung/report.php' . $qid)) ?>">Report</a>
+    </div>
+  </div>
+
+<?php else: ?>
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
+    <a class="btn" href="<?= e(url('/sf-auswertung/')) ?>">Import</a>
+    <a class="btn" href="<?= e(url('/sf-auswertung/report.php')) ?>">Report</a>
+  </div>
+<?php endif; ?>
 
     <div style="flex:1 1 auto;">
       <h2 style="margin: 0 0 8px;"><?= e($guild['server']) ?> – <?= e($guild['name']) ?></h2>
