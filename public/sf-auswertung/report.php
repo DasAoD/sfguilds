@@ -75,7 +75,7 @@ function sf_eval_render_table(array $rows): string {
           .  '<th>Spieler</th>'
           .  '<th style="text-align:right;">Kämpfe</th>'
           .  '<th style="text-align:right;">Angemeldet</th>'
-          .  '<th style="text-align:right;">Nicht da</th>'
+          .  '<th style="text-align:right;">Nicht angemeldet</th>'
           .  '<th style="text-align:right;">%</th>'
           .  '</tr></thead><tbody>';
 
