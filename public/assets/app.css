@@ -88,15 +88,28 @@ hr {
 }
 
 .notice {
-	padding: 10px 12px;
-	border-radius: 8px;
-	margin: 10px 0;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
 }
+
+/* Erfolg (grün) */
+.notice.success,
 .notice.ok {
-	border: 1px solid #2e7d32;
+  border-color: rgba(0,255,0,.25);
+  background: rgba(0,160,0,.18);
 }
+
+/* Duplikat/Warnung (orange) */
+.notice.warn {
+  border-color: rgba(255,170,0,.35);
+  background: rgba(255,140,0,.18);
+}
+
+/* Fehler (rot) */
+.notice.error,
 .notice.err {
-	border: 1px solid #c62828;
+  border-color: rgba(255,0,0,.25);
+  background: rgba(180,0,0,.18);
 }
 
 .grid {
