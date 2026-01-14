@@ -102,6 +102,10 @@ Standard-Installationspfad (Beispiel):
     │   └── processing
     └── sfguilds.sqlite
 ```
+---
+
+In Arbeit:
+- Auswertung für Gildenangriffe und -verteidigung pro Gilde.
 
 ## Lizenz
 
