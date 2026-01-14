@@ -66,7 +66,7 @@ ob_start();
   <div class="notice error"><?= e($error) ?></div>
 <?php endif; ?>
 
-<form method="post" style="margin-top: 12px;">
+<form method="post" style="margin-top: 12px; max-width: 900px;">
   <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 720px;">
     <label>
       <div>Meine Gilde</div>
@@ -94,9 +94,7 @@ ob_start();
 
   <label style="display:block; margin-top: 12px;">
     <div>Post-Text (reinkopieren)</div>
-    <div style="max-width: 900px;">
     <textarea name="text" rows="18" required style="width:100%;"><?= e($_POST['text'] ?? '') ?></textarea>
-    </div>
   </label>
 
   <div style="margin-top: 12px;">
