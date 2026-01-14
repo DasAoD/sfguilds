@@ -12,6 +12,9 @@ if (!isAdmin()) {
 }
 
 $title = 'SF Auswertung – Report';
+if ($guild) {
+    $title = $guild['server'] . ' – ' . $guild['name'] . ' – Report';
+}
 $guilds = sf_eval_guilds();
 
 $guildId = (int)($_GET['guild_id'] ?? 0);
@@ -62,7 +65,7 @@ if ($guildId > 0) {
 
 ob_start();
 ?>
-<h1>SF Auswertung – Report</h1>
+<h1><?= e($title) ?></h1>
 
 <?php
 $importFlag = (string)($_GET['import'] ?? '');
@@ -137,7 +140,7 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
 
 <form method="get" style="margin-bottom: 16px;">
   <label>
-    <div>Gilde auswählen</div>
+    <div>Wechseln zu …</div>
     <select name="guild_id" onchange="this.form.submit()">
       <option value="0">– bitte wählen –</option>
       <?php foreach ($guilds as $g): ?>
@@ -154,10 +157,10 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
   <p>Bitte oben eine Gilde auswählen.</p>
 <?php else: ?>
 
-  <h2>Angriffe (<?= (int)($attack['battles'] ?? 0) ?> Kämpfe)</h2>
+  <h2>Angriffe (<?= (int)$stats['attacks'] ?> Kämpfe)</h2>
   <?= sf_eval_render_table($attack['rows'] ?? []) ?>
 
-  <h2 style="margin-top:22px;">Verteidigungen (<?= (int)($defense['battles'] ?? 0) ?> Kämpfe)</h2>
+  <h2 style="margin-top:22px;">Verteidigungen (<?= (int)$stats['defenses'] ?> Kämpfe)</h2>
   <?= sf_eval_render_table($defense['rows'] ?? []) ?>
 
 <?php endif; ?>
