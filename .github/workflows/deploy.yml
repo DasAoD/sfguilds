@@ -37,6 +37,7 @@ jobs:
           ssh -T -p 3785 \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
             -o ConnectTimeout=10 \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=3 \
