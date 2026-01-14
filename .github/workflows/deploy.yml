@@ -30,7 +30,31 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-
+      - name: SSH preflight (debug)
+        continue-on-error: true
+        run: |
+          set -euxo pipefail
+          echo "== DNS =="
+          getent hosts vpn.uliana.de || true
+        
+            echo "== TCP Port check 3785 =="
+            timeout 5 bash -lc 'cat < /dev/null > /dev/tcp/vpn.uliana.de/3785' && echo "TCP OK" || echo "TCP FAIL"
+            
+                echo "== ~/.ssh =="
+                ls -la ~/.ssh || true
+                echo "known_hosts lines:"
+                wc -l ~/.ssh/known_hosts || true
+                echo "known_hosts preview:"
+                sed -n '1,3p' ~/.ssh/known_hosts || true
+                
+                    echo "== ssh -vvv =="
+                    ssh -vvv -T -p 3785 \
+                    -o BatchMode=yes \
+                    -o StrictHostKeyChecking=yes \
+                    -o UserKnownHostsFile=~/.ssh/known_hosts \
+                    -o ConnectTimeout=10 \
+                    deploy@vpn.uliana.de || true
+                    
       - name: Deploy (forced command on server)
         shell: bash
         run: |
