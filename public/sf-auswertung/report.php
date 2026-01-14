@@ -36,19 +36,33 @@ $importPlayers = (string)($_GET['players'] ?? '');
 $importTypeLabel = ($importType === 'attack') ? 'Angriff' : (($importType === 'defense') ? 'Verteidigung' : '');
 ?>
 
+<?php
+$importFlag = (string)($_GET['import'] ?? '');
+$importType = (string)($_GET['type'] ?? '');
+$importOpponent = trim((string)($_GET['opponent'] ?? ''));
+$importPlayers = trim((string)($_GET['players'] ?? ''));
+
+$importTypeLabel = ($importType === 'attack') ? 'Angriff' : (($importType === 'defense') ? 'Verteidigung' : 'Kampf');
+$details = $importTypeLabel;
+
+if ($importOpponent !== '') {
+    $details .= ' gegen „' . $importOpponent . '“';
+}
+if ($importPlayers !== '' && ctype_digit($importPlayers)) {
+    $details .= ' (' . $importPlayers . ' Einträge)';
+}
+?>
+
 <?php if ($importFlag === 'ok'): ?>
-  <div class="notice success">
-    Import OK: <?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“
-    <?php if ($importPlayers !== ''): ?>(<?= e($importPlayers) ?> Einträge)<?php endif; ?>
+  <div class="notice success" style="max-width: 900px;">
+    <div><strong>Import erfolgreich.</strong></div>
+    <div><?= e($details) ?></div>
   </div>
 <?php elseif ($importFlag === 'dup'): ?>
-  <div class="notice warn">
-    Duplikat erkannt: <?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“ war bereits importiert.
+  <div class="notice warn" style="max-width: 900px;">
+    <div><strong>Duplikat erkannt.</strong></div>
+    <div><?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“ war bereits importiert.</div>
   </div>
-<?php endif; ?>
-
-<?php if (($_GET['import'] ?? '') === 'ok'): ?>
-  <div class="notice success">Import erfolgreich.</div>
 <?php endif; ?>
 
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
