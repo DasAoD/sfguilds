@@ -46,7 +46,7 @@ $lastImportNice = null;
 if (!empty($stats['last_import'])) {
     try {
         $dt = new DateTime($stats['last_import']);
-        $lastImportNice = $dt->format('d.m.Y H:i');
+        $lastImportNice = $dt->format('d.m.Y');
     } catch (Throwable $e) {
         $lastImportNice = $stats['last_import'];
     }
