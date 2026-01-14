@@ -42,7 +42,7 @@ $importTypeLabel = ($importType === 'attack') ? 'Angriff' : (($importType === 'd
     <?php if ($importPlayers !== ''): ?>(<?= e($importPlayers) ?> Einträge)<?php endif; ?>
   </div>
 <?php elseif ($importFlag === 'dup'): ?>
-  <div class="notice error">
+  <div class="notice warn">
     Duplikat erkannt: <?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“ war bereits importiert.
   </div>
 <?php endif; ?>
