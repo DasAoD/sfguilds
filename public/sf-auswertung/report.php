@@ -27,6 +27,26 @@ ob_start();
 ?>
 <h1>SF Auswertung – Report</h1>
 
+<?php
+$importFlag = (string)($_GET['import'] ?? '');
+$importType = (string)($_GET['type'] ?? '');
+$importOpponent = (string)($_GET['opponent'] ?? '');
+$importPlayers = (string)($_GET['players'] ?? '');
+
+$importTypeLabel = ($importType === 'attack') ? 'Angriff' : (($importType === 'defense') ? 'Verteidigung' : '');
+?>
+
+<?php if ($importFlag === 'ok'): ?>
+  <div class="notice success">
+    Import OK: <?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“
+    <?php if ($importPlayers !== ''): ?>(<?= e($importPlayers) ?> Einträge)<?php endif; ?>
+  </div>
+<?php elseif ($importFlag === 'dup'): ?>
+  <div class="notice error">
+    Duplikat erkannt: <?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“ war bereits importiert.
+  </div>
+<?php endif; ?>
+
 <?php if (($_GET['import'] ?? '') === 'ok'): ?>
   <div class="notice success">Import erfolgreich.</div>
 <?php endif; ?>
