@@ -52,8 +52,9 @@ $importTypeLabel = ($importType === 'attack') ? 'Angriff' : (($importType === 'd
 <?php endif; ?>
 
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
-  <a class="btn" href="<?= e(url('/sf-auswertung/')) ?>">Import</a>
-  <a class="btn" href="<?= e(url('/sf-auswertung/report.php')) ?>">Report</a>
+  <?php $qid = ($guildId > 0) ? ('?guild_id=' . $guildId) : ''; ?>
+  <a class="btn" href="<?= e(url('/sf-auswertung/' . $qid)) ?>">Import</a>
+  <a class="btn" href="<?= e(url('/sf-auswertung/report.php' . $qid)) ?>">Report</a>
 </div>
 
 <form method="get" style="margin-bottom: 16px;">
