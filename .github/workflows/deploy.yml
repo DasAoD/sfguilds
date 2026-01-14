@@ -23,12 +23,6 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
 
           printf '%s\n' "${{ secrets.SFGUILDS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-      - name: Add known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
       - name: SSH preflight (debug)
         continue-on-error: true
@@ -49,6 +43,8 @@ jobs:
                 
                     echo "== ssh -vvv =="
                     ssh -vvv -T -p 3785 \
+                    -i ~/.ssh/id_ed25519 \
+                    -o IdentitiesOnly=yes \
                     -o BatchMode=yes \
                     -o StrictHostKeyChecking=yes \
                     -o UserKnownHostsFile=~/.ssh/known_hosts \
@@ -59,10 +55,12 @@ jobs:
         shell: bash
         run: |
           ssh -T -p 3785 \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile=~/.ssh/known_hosts \
-            -o ConnectTimeout=10 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=3 \
-            deploy@vpn.uliana.de
+          -i ~/.ssh/id_ed25519 \
+          -o IdentitiesOnly=yes \
+          -o BatchMode=yes \
+          -o StrictHostKeyChecking=yes \
+          -o UserKnownHostsFile=~/.ssh/known_hosts \
+          -o ConnectTimeout=10 \
+          -o ServerAliveInterval=30 \
+          -o ServerAliveCountMax=3 \
+          deploy@vpn.uliana.de
