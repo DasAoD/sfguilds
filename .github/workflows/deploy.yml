@@ -25,9 +25,6 @@ jobs:
           printf '%s\n' "${{ secrets.SFGUILDS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-          echo "known_hosts lines: $(wc -l < ~/.ssh/known_hosts)"
-          echo "known_hosts bytes: $(wc -c < ~/.ssh/known_hosts)"
-
       - name: Deploy (forced command on server)
         shell: bash
         run: |
