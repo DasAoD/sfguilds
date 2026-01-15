@@ -72,7 +72,6 @@ if (!empty($stats['last_import'])) {
 
 ob_start();
 ?>
-<h2><?= e($title) ?></h2>
 
 <?php
 $importFlag     = (string)($_GET['import'] ?? '');
@@ -92,12 +91,12 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
 ?>
 
 <?php if ($importFlag === 'ok'): ?>
-  <div class="notice success" style="max-width: 900px;">
+  <div class="notice success narrow">
     <div><strong>Import erfolgreich.</strong></div>
     <div><?= e($details) ?></div>
   </div>
 <?php elseif ($importFlag === 'dup'): ?>
-  <div class="notice warn" style="max-width: 900px;">
+  <div class="notice warn narrow">
     <div><strong>Duplikat erkannt.</strong></div>
     <div><?= e($importTypeLabel) ?> gegen „<?= e($importOpponent) ?>“ war bereits importiert.</div>
   </div>
@@ -105,17 +104,44 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
 
 <?php
 $qid = ($guildId > 0) ? ('?guild_id=' . $guildId) : '';
+$importHref = url('/sf-auswertung/' . $qid);
+$reportHref = url('/sf-auswertung/report.php' . $qid);
 ?>
 
-<?php if ($guild): ?>
-  <div style="max-width: 900px; margin: 16px 0 18px;">
-    <?php if (!empty($guild['crest_file'])): ?>
-      <img
-        src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>"
-        alt=""
-        style="max-width: 260px; height:auto; display:block;"
-      >
-    <?php endif; ?>
+<div class="report-head">
+	<div class="report-left">
+		<?php if ($guild && !empty($guild['crest_file'])): ?>
+			<div class="report-crest">
+				<img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>" alt="">
+			</div>
+		<?php endif; ?>
+
+		<div class="report-meta">
+			<h2 class="report-title">
+				<?php if ($guild): ?>
+					<?= e($guild['server']) ?> – <?= e($guild['name']) ?> <span class="muted">(Report)</span>
+				<?php else: ?>
+					SF Auswertung <span class="muted">(Report)</span>
+				<?php endif; ?>
+			</h2>
+
+			<?php if ($guild): ?>
+				<div class="report-stats">
+					<strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
+					<strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
+					<?php if ($lastImportNice): ?>
+						<span class="muted">| Letzter Import: <?= e($lastImportNice) ?></span>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
+		</div>
+	</div>
+
+	<div class="report-actions">
+		<a class="btn pill" href="<?= e($importHref) ?>">Import</a>
+		<a class="btn pill active" href="<?= e($reportHref) ?>">Report</a>
+	</div>
+</div>
 
     <div style="opacity:.9; margin-top: 10px;">
       <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
@@ -177,7 +203,7 @@ function sf_eval_render_table(array $rows): string
         return '<p style="opacity:.85;">Noch keine Daten.</p>';
     }
 
-    $html = '<div style="overflow:auto;"><table class="table">';
+    $html = '<div class="table-wrap"><table class="table">';
     $html .= '<thead><tr>'
         .  '<th>Spieler</th>'
         .  '<th style="text-align:right;">Kämpfe</th>'
