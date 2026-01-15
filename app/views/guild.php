@@ -32,12 +32,17 @@
 <?php endif; ?>
 
 <?php if (isAdmin()): ?>
-<p style="margin-top:0;">
+<p style="margin-top:0; display:flex; gap:10px; flex-wrap:wrap;">
     <a class="btn" href="<?= e(
         url("/admin/members.php?guild_id=" . (int) $guild["id"] . "#members"),
-	) ?>">Bearbeiten</a>
+    ) ?>">Bearbeiten</a>
+
+    <a class="btn" href="<?= e(
+        url("/sf-auswertung/report.php?guild_id=" . (int) $guild["id"]),
+    ) ?>">Report</a>
 </p>
 <?php endif; ?>
+
 <div class="box" style="margin: .75rem 0;">
 	<strong>Aktiv:</strong> <?= (int) ($guild["members_active"] ?? 0) ?>
 </div>
