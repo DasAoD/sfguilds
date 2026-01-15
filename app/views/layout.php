@@ -44,8 +44,8 @@ $title = $title ?? "S&F Guilds";
 						<?= a_active('/admin/', 'Admin', 'btn', true) ?>
 						<a class="btn" href="<?= e(url("/admin/logout.php")) ?>">Logout</a>
 						<?php else: ?>
-						<a class="btn" href="<?= e(
-						url("/admin/login.php?next=" . rawurlencode($_SERVER["REQUEST_URI"] ?? "/"))) ?>">Login</a>
+						<?= a_active(
+						url("/admin/login.php?next=" . rawurlencode($_SERVER["REQUEST_URI"] ?? "/")), 'Login', 'btn') ?>
 					<?php endif; ?>
 				</nav>
 			</div>
@@ -53,30 +53,31 @@ $title = $title ?? "S&F Guilds";
 			<a class="header-right" href="/" aria-label="Home">
 				<img src="/assets/sf-logo.png" alt="Shakes & Fidget" class="sf-logo">
 			</a>
-			
-			<?php $__flash_rendered = false; ?>
-			
+
 			<?php
-				// verhindert doppelte Meldungen in Views (z.B. admin.php)
-				$GLOBALS["__flash_rendered"] = false;
-				
-				// 1) Wenn der Controller schon msg_ok/msg_err übergibt: nutzen (verbraucht die Flash-Message nicht nochmal)
-				// 2) Sonst direkt aus der Session-Flash holen (Keys sind ok/err)
-				$ok = $msg_ok ?? null;
+			// Flash/Notices nur 1x pro Request rendern (einige Views haben eigene Notices)
+			if (!($GLOBALS['__flash_rendered'] ?? false)) {
+				$ok  = $msg_ok  ?? null;
 				$err = $msg_err ?? null;
-				
-				if ($ok === null || $ok === "") {
-					$ok = flash_get("ok");
+
+				// 1) Wenn Controller msg_ok/msg_err übergibt: nutzen (ohne Flash erneut zu "verbrauchen")
+				// 2) Sonst aus Session-Flash holen (Keys: ok/err)
+				if ($ok === null || $ok === '')  { $ok  = flash_get('ok'); }
+				if ($err === null || $err === '') { $err = flash_get('err'); }
+
+				if (!empty($ok)) {
+					echo '<div class="notice success">' . e((string)$ok) . '</div>';
 				}
-				if ($err === null || $err === "") {
-					$err = flash_get("err");
+				if (!empty($err)) {
+					echo '<div class="notice error">' . e((string)$err) . '</div>';
 				}
-				
+
 				if (!empty($ok) || !empty($err)) {
-					$GLOBALS["__flash_rendered"] = true;
+					$GLOBALS['__flash_rendered'] = true;
 				}
+			}
 			?>
-			
+
 			<?php if (!empty($ok)): ?>
 			<p class="flash flash-ok"><?= e($ok) ?></p>
 			<?php endif; ?>
@@ -92,7 +93,7 @@ $title = $title ?? "S&F Guilds";
 			
 		</header>
 		
-		<?php $isGuildsView = basename($viewFile) === "guilds.php"; ?>
+		<?php $isGuildsView = isset($viewFile) && basename($viewFile) === "guilds.php"; ?>
 		<main class="wrap<?= $isGuildsView ? "" : " card" ?>">
 			<?php // 1) Wenn $content gesetzt ist, kann das ein String oder eine Closure sein.
 				
