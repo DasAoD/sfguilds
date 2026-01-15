@@ -42,75 +42,64 @@ $title = $title ?? "S&F Guilds";
 					<?php if (isAdmin()): ?>
 						<?= a_active('/sf-auswertung/', 'SF Auswertung', 'btn', true) ?>
 						<?= a_active('/admin/', 'Admin', 'btn', true) ?>
-						<a class="btn" href="<?= e(url("/admin/logout.php")) ?>">Logout</a>
-						<?php else: ?>
+						<a class="btn" href="<?= e(url('/admin/logout.php')) ?>">Logout</a>
+					<?php else: ?>
 						<?= a_active(
-						url("/admin/login.php?next=" . rawurlencode($_SERVER["REQUEST_URI"] ?? "/")), 'Login', 'btn') ?>
+							url('/admin/login.php?next=' . rawurlencode($_SERVER['REQUEST_URI'] ?? '/')),
+							'Login',
+							'btn'
+						) ?>
 					<?php endif; ?>
 				</nav>
 			</div>
-			
+
 			<a class="header-right" href="/" aria-label="Home">
 				<img src="/assets/sf-logo.png" alt="Shakes & Fidget" class="sf-logo">
 			</a>
+		</header>
 
+		<?php
+		// Flash/Notices nur 1x pro Request rendern (einige Views rendern ggf. selbst)
+		if (!($GLOBALS['__flash_rendered'] ?? false)) {
+			$ok  = $msg_ok  ?? null;
+			$err = $msg_err ?? null;
+
+			// Wenn Controller nichts übergibt: aus Session-Flash holen (Keys: ok/err)
+			if ($ok === null || $ok === '')  { $ok  = flash_get('ok'); }
+			if ($err === null || $err === '') { $err = flash_get('err'); }
+
+			if (!empty($ok)) {
+				echo '<div class="notice success">' . e((string)$ok) . '</div>';
+			}
+			if (!empty($err)) {
+				echo '<div class="notice error">' . e((string)$err) . '</div>';
+			}
+
+			if (!empty($ok) || !empty($err)) {
+				$GLOBALS['__flash_rendered'] = true;
+			}
+		}
+		?>
+
+		<?php $isGuildsView = isset($viewFile) && basename($viewFile) === 'guilds.php'; ?>
+		<main class="wrap<?= $isGuildsView ? '' : ' card' ?>">
 			<?php
-			// Flash/Notices nur 1x pro Request rendern (einige Views haben eigene Notices)
-			if (!($GLOBALS['__flash_rendered'] ?? false)) {
-				$ok  = $msg_ok  ?? null;
-				$err = $msg_err ?? null;
-
-				// 1) Wenn Controller msg_ok/msg_err übergibt: nutzen (ohne Flash erneut zu "verbrauchen")
-				// 2) Sonst aus Session-Flash holen (Keys: ok/err)
-				if ($ok === null || $ok === '')  { $ok  = flash_get('ok'); }
-				if ($err === null || $err === '') { $err = flash_get('err'); }
-
-				if (!empty($ok)) {
-					echo '<div class="notice success">' . e((string)$ok) . '</div>';
+			// 1) Wenn $content gesetzt ist, kann das ein String oder eine Closure sein.
+			if (isset($content)) {
+				if (is_callable($content)) {
+					$content();
+				} else {
+					echo $content;
 				}
-				if (!empty($err)) {
-					echo '<div class="notice error">' . e((string)$err) . '</div>';
-				}
-
-				if (!empty($ok) || !empty($err)) {
-					$GLOBALS['__flash_rendered'] = true;
-				}
+			// 2) Sonst: klassisch eine View-Datei einbinden.
+			} elseif (isset($viewFile)) {
+				require $viewFile;
 			}
 			?>
-
-			<?php if (!empty($ok)): ?>
-			<p class="flash flash-ok"><?= e($ok) ?></p>
-			<?php endif; ?>
-			
-			<?php if (!empty($err)): ?>
-			<p class="flash flash-err"><?= e($err) ?></p>
-			<?php endif; ?>
-			
-			
-			<?php if ($__flash_rendered) {
-				$GLOBALS["__flash_rendered"] = true;
-			} ?>
-			
-		</header>
-		
-		<?php $isGuildsView = isset($viewFile) && basename($viewFile) === "guilds.php"; ?>
-		<main class="wrap<?= $isGuildsView ? "" : " card" ?>">
-			<?php // 1) Wenn $content gesetzt ist, kann das ein String oder eine Closure sein.
-				
-				if (isset($content)) {
-					if (is_callable($content)) {
-						$content();
-						} else {
-						echo $content;
-					}
-					// 2) Sonst: klassisch eine View-Datei einbinden.
-					} elseif (isset($viewFile)) {
-					require $viewFile;
-				} ?>
 		</main>
-		
+
 		<footer class="wrap footer">
-			<small><?= e(gmdate("d.m.Y - H:i")) ?> UTC</small>
+			<small><?= e(gmdate('d.m.Y - H:i')) ?> UTC</small>
 		</footer>
 	</body>
 </html>
