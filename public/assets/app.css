@@ -67,16 +67,11 @@ hr {
 	display: block;
 }
 
-@media (max-width: 600px) {
-	.sf-logo {
-		height: 84px;
-	}
-}
-
 /* Navigation */
 .nav .btn {
 	margin-right: 12px;
 }
+
 .nav .btn:last-child {
 	margin-right: 0;
 }
@@ -154,6 +149,12 @@ button {
 	-webkit-overflow-scrolling: touch;
 }
 
+/* Optional: kompaktere Tabellen */
+.table.compact th,
+.table.compact td {
+	padding: 6px 8px;
+}
+
 /* Admin: große Tabellen im "Kasten" halten + vertikal scrollen */
 .admin-card .table-wrap {
 	overflow: auto;
@@ -161,14 +162,9 @@ button {
 	border-radius: 10px;
 }
 
-/* Optional: kompaktere Tabellen */
-.table.compact th,
-.table.compact td {
-	padding: 6px 8px;
-}
-
-/* Notices (Statusmeldungen) */
-.notice {
+/* Notices + Flash (konsolidiert) */
+.notice,
+.flash {
 	padding: 10px 12px;
 	border-radius: 8px;
 	margin: 10px 0;
@@ -178,7 +174,8 @@ button {
 
 /* Erfolg (grün) */
 .notice.success,
-.notice.ok {
+.notice.ok,
+.flash-ok {
 	border-color: rgba(0, 255, 0, 0.25);
 	background: rgba(0, 160, 0, 0.18);
 }
@@ -191,25 +188,7 @@ button {
 
 /* Fehler (rot) */
 .notice.error,
-.notice.err {
-	border-color: rgba(255, 0, 0, 0.25);
-	background: rgba(180, 0, 0, 0.18);
-}
-
-/* Flash-Messages (falls noch irgendwo genutzt) */
-.flash {
-	padding: 0.5rem 0.75rem;
-	border-radius: 0.5rem;
-	margin: 0.75rem 0;
-	background: rgba(255, 255, 255, 0.06);
-	border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.flash-ok {
-	border-color: rgba(0, 255, 0, 0.25);
-	background: rgba(0, 160, 0, 0.18);
-}
-
+.notice.err,
 .flash-err {
 	border-color: rgba(255, 0, 0, 0.25);
 	background: rgba(180, 0, 0, 0.18);
@@ -294,61 +273,33 @@ tr.row-note a:visited {
 
 /* Spaltenbreiten */
 .members-table th:nth-child(1),
-.members-table td:nth-child(1) {
-	width: 4ch;
-}
+.members-table td:nth-child(1) { width: 4ch; }
 .members-table th:nth-child(2),
-.members-table td:nth-child(2) {
-	width: 16ch;
-}
+.members-table td:nth-child(2) { width: 16ch; }
 .members-table th:nth-child(3),
-.members-table td:nth-child(3) {
-	width: 5ch;
-}
+.members-table td:nth-child(3) { width: 5ch; }
 .members-table th:nth-child(4),
-.members-table td:nth-child(4) {
-	width: 11ch;
-}
+.members-table td:nth-child(4) { width: 11ch; }
 .members-table th:nth-child(5),
-.members-table td:nth-child(5) {
-	width: 11ch;
-}
+.members-table td:nth-child(5) { width: 11ch; }
 .members-table th:nth-child(6),
-.members-table td:nth-child(6) {
-	width: 9ch;
-}
+.members-table td:nth-child(6) { width: 9ch; }
 .members-table th:nth-child(7),
-.members-table td:nth-child(7) {
-	width: 9ch;
-}
+.members-table td:nth-child(7) { width: 9ch; }
 .members-table th:nth-child(8),
-.members-table td:nth-child(8) {
-	width: 9ch;
-}
+.members-table td:nth-child(8) { width: 9ch; }
 .members-table th:nth-child(9),
-.members-table td:nth-child(9) {
-	width: 9ch;
-}
+.members-table td:nth-child(9) { width: 9ch; }
 .members-table th:nth-child(10),
-.members-table td:nth-child(10) {
-	width: 9ch;
-}
+.members-table td:nth-child(10) { width: 9ch; }
 .members-table th:nth-child(11),
-.members-table td:nth-child(11) {
-	width: 11ch;
-}
+.members-table td:nth-child(11) { width: 11ch; }
 .members-table th:nth-child(12),
-.members-table td:nth-child(12) {
-	width: 11ch;
-}
+.members-table td:nth-child(12) { width: 11ch; }
 .members-table th:nth-child(13),
-.members-table td:nth-child(13) {
-	width: 46ch;
-}
+.members-table td:nth-child(13) { width: 46ch; }
 .members-table th:nth-child(14),
-.members-table td:nth-child(14) {
-	width: 10ch;
-}
+.members-table td:nth-child(14) { width: 10ch; }
 
 .members-table .rownum {
 	text-align: right;
@@ -611,6 +562,7 @@ button.small {
 	padding: 4px 8px;
 }
 
+/* Danger */
 .btn.danger {
 	border-color: rgba(255, 0, 0, 0.35);
 }
@@ -678,7 +630,7 @@ button.danger:hover,
 	}
 }
 
-/* SF Auswertung – Report Header (untereinander wie Gildenseite) */
+/* SF Auswertung – Report Header (falls du später wieder auf Klassen umstellst) */
 .report-head {
 	max-width: 900px;
 	margin: 16px 0 18px;
@@ -693,11 +645,11 @@ button.danger:hover,
 }
 
 .report-crest img {
-	max-width: 320px;   /* wenn du’s noch exakt angleichen willst: sag kurz Bescheid */
+	max-width: 320px;
 	width: auto;
 	height: auto;
 	display: block;
-	margin: 0 auto;     /* zentriert wie auf der Gildenseite */
+	margin: 0 auto;
 }
 
 .report-stats {
@@ -716,6 +668,7 @@ button.danger:hover,
 	margin-top: 12px;
 }
 
+/* Utilities */
 .narrow {
 	max-width: 900px;
 }
