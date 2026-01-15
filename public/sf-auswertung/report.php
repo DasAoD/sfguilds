@@ -117,7 +117,6 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
       <div style="opacity:.75; margin-top: 6px;">
         Letzter Import: <?= e($lastImportNice) ?>
       </div>
-    <?php endif; ?>
 
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px;">
       <a class="btn" href="<?= e(url('/sf-auswertung/' . $qid)) ?>">Import</a>
