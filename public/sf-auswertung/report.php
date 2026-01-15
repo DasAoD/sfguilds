@@ -108,34 +108,31 @@ $importHref = url('/sf-auswertung/' . $qid);
 $reportHref = url('/sf-auswertung/report.php' . $qid);
 ?>
 
-<div class="report-head">
-  <div class="report-left">
-    <?php if ($guild && !empty($guild['crest_file'])): ?>
-      <div class="report-crest">
-        <img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>" alt="">
-      </div>
+<div class="report-head narrow">
+  <h2 class="report-title">
+    <?php if ($guild): ?>
+      <?= e($guild['server']) ?> – <?= e($guild['name']) ?> <span class="muted">(Report)</span>
+    <?php else: ?>
+      SF Auswertung <span class="muted">(Report)</span>
     <?php endif; ?>
+  </h2>
 
-    <div class="report-meta">
-      <h2 class="report-title">
-        <?php if ($guild): ?>
-          <?= e($guild['server']) ?> – <?= e($guild['name']) ?> <span class="muted">(Report)</span>
-        <?php else: ?>
-          SF Auswertung <span class="muted">(Report)</span>
-        <?php endif; ?>
-      </h2>
-
-      <?php if ($guild): ?>
-        <div class="report-stats">
-          <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
-          <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
-          <?php if ($lastImportNice): ?>
-            <span class="muted">| Letzter Import: <?= e($lastImportNice) ?></span>
-          <?php endif; ?>
-        </div>
-      <?php endif; ?>
+  <?php if ($guild && !empty($guild['crest_file'])): ?>
+    <div class="report-crest">
+      <img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>" alt="">
     </div>
-  </div>
+  <?php endif; ?>
+
+  <?php if ($guild): ?>
+    <div class="report-stats">
+      <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
+      <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
+    </div>
+
+    <?php if ($lastImportNice): ?>
+      <div class="report-last muted">Letzter Import: <?= e($lastImportNice) ?></div>
+    <?php endif; ?>
+  <?php endif; ?>
 
   <div class="report-actions">
     <a class="btn pill" href="<?= e($importHref) ?>">Import</a>
