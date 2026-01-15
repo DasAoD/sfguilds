@@ -108,8 +108,8 @@ $importHref = url('/sf-auswertung/' . $qid);
 $reportHref = url('/sf-auswertung/report.php' . $qid);
 ?>
 
-<div class="report-head narrow">
-  <h2 style="margin: 0 0 .5rem 0;">
+<div class="report-head">
+  <h2>
     <?php if ($guild): ?>
       <?= e($guild['server']) ?> – <?= e($guild['name']) ?> <span class="muted">(Report)</span>
     <?php else: ?>
