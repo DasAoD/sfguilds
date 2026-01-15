@@ -1,5 +1,30 @@
 <?php
-$title = $title ?? "S&F Guilds"; ?>
+function a_active(string $href, string $label, string $class = 'btn', bool $prefix = false): string
+{
+    $reqPath  = (string)(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
+    $hrefPath = (string)(parse_url($href, PHP_URL_PATH) ?? $href);
+
+    $norm = static function (string $p): string {
+        $p = '/' . ltrim($p, '/');
+        if ($p !== '/') $p = rtrim($p, '/');
+        return $p;
+    };
+
+    $req    = $norm($reqPath);
+    $target = $norm($hrefPath);
+
+    $active = $prefix && $target !== '/'
+        ? ($req === $target || str_starts_with($req . '/', $target . '/'))
+        : ($req === $target);
+
+    $cls  = trim($class . ($active ? ' active' : ''));
+    $aria = $active ? ' aria-current="page"' : '';
+
+    return '<a class="' . e($cls) . '" href="' . e($href) . '"' . $aria . '>' . e($label) . '</a>';
+}
+
+$title = $title ?? "S&F Guilds";
+?>
 <!doctype html>
 <html lang="de">
 	<head>
@@ -13,15 +38,14 @@ $title = $title ?? "S&F Guilds"; ?>
 			<div class="header-left">
 				<h1><a href="/" class="brand">S&F Guilds</a></h1>
 				<nav class="nav">
-					<a class="btn" href="/">Home</a>
+					<?= a_active('/', 'Home', 'btn') ?>
 					<?php if (isAdmin()): ?>
-					<a class="btn" href="/sf-auswertung/">SF Auswertung</a>
-					<a class="btn" href="/admin/">Admin</a>
-					<a class="btn" href="<?= e(url("/admin/logout.php")) ?>">Logout</a>
-					<?php else: ?>
-					<a class="btn" href="<?= e(
-						url("/admin/login.php?next=" . rawurlencode($_SERVER["REQUEST_URI"] ?? "/")),
-					) ?>">Login</a>
+						<?= a_active('/sf-auswertung/', 'SF Auswertung', 'btn', true) ?>
+						<?= a_active('/admin/', 'Admin', 'btn', true) ?>
+						<a class="btn" href="<?= e(url("/admin/logout.php")) ?>">Logout</a>
+						<?php else: ?>
+						<a class="btn" href="<?= e(
+						url("/admin/login.php?next=" . rawurlencode($_SERVER["REQUEST_URI"] ?? "/"))) ?>">Login</a>
 					<?php endif; ?>
 				</nav>
 			</div>
