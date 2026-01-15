@@ -117,6 +117,12 @@ $reportHref = url('/sf-auswertung/report.php' . $qid);
     <?php endif; ?>
   </h2>
 
+  <?php if ($guild && $lastImportNice): ?>
+    <div class="report-updated muted">
+      Letzte Aktualisierung: <strong><?= e($lastImportNice) ?></strong>
+    </div>
+  <?php endif; ?>
+
   <?php if ($guild && !empty($guild['crest_file'])): ?>
     <div class="report-crest">
       <img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>" alt="">
@@ -128,10 +134,6 @@ $reportHref = url('/sf-auswertung/report.php' . $qid);
       <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
       <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
     </div>
-
-    <?php if ($lastImportNice): ?>
-      <div class="report-last muted">Letzter Import: <?= e($lastImportNice) ?></div>
-    <?php endif; ?>
   <?php endif; ?>
 
   <div class="report-actions">
