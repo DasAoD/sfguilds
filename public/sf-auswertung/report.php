@@ -72,7 +72,7 @@ if (!empty($stats['last_import'])) {
 
 ob_start();
 ?>
-<h1><?= e($title) ?></h1>
+<h2><?= e($title) ?></h2>
 
 <?php
 $importFlag     = (string)($_GET['import'] ?? '');
