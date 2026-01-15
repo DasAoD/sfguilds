@@ -109,7 +109,7 @@ $reportHref = url('/sf-auswertung/report.php' . $qid);
 ?>
 
 <div class="report-head narrow">
-  <h2 class="report-title">
+  <h2 style="margin: 0 0 .5rem 0;">
     <?php if ($guild): ?>
       <?= e($guild['server']) ?> – <?= e($guild['name']) ?> <span class="muted">(Report)</span>
     <?php else: ?>
@@ -118,28 +118,32 @@ $reportHref = url('/sf-auswertung/report.php' . $qid);
   </h2>
 
   <?php if ($guild && $lastImportNice): ?>
-    <div class="report-updated muted">
+    <p class="muted" style="margin: 0 0 .75rem 0;">
       Letzte Aktualisierung: <strong><?= e($lastImportNice) ?></strong>
-    </div>
+    </p>
   <?php endif; ?>
 
   <?php if ($guild && !empty($guild['crest_file'])): ?>
-    <div class="report-crest">
-      <img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>" alt="">
-    </div>
+    <p style="margin: .5rem 0 .75rem 0;">
+      <img
+        src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>"
+        alt="Wappen"
+        style="height:300px; width:300px; object-fit:cover; border-radius:12px;"
+      >
+    </p>
   <?php endif; ?>
 
   <?php if ($guild): ?>
-    <div class="report-stats">
+    <div style="opacity:.9; margin-top: 10px;">
       <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
       <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
     </div>
   <?php endif; ?>
 
-  <div class="report-actions">
-    <a class="btn pill" href="<?= e($importHref) ?>">Import</a>
-    <a class="btn pill active" href="<?= e($reportHref) ?>">Report</a>
-  </div>
+  <p style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap;">
+    <a class="btn" href="<?= e($importHref) ?>">Import</a>
+    <a class="btn active" href="<?= e($reportHref) ?>">Report</a>
+  </p>
 </div>
 
 <form method="get" style="margin-bottom: 16px;">
