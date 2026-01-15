@@ -11,67 +11,74 @@ if (!isAdmin()) {
     exit;
 }
 
-$title = 'SF Auswertung – Report';
+$title  = 'SF Auswertung – Report';
 $guilds = sf_eval_guilds();
 
 $guildId = (int)($_GET['guild_id'] ?? 0);
-$guild = null;
-$stats = ['attacks' => 0, 'defenses' => 0, 'last_import' => null];
+$guild   = null;
+
+$stats = [
+    'attacks'     => 0,
+    'defenses'    => 0,
+    'last_import' => null,
+];
+
+$attack  = null;
+$defense = null;
 
 if ($guildId > 0) {
     // Guild-Infos
     $st = db()->prepare("SELECT id, name, server, crest_file FROM guilds WHERE id = ?");
     $st->execute([$guildId]);
     $guild = $st->fetch(PDO::FETCH_ASSOC) ?: null;
-    if ($guild) {
-      $title = $guild['server'] . ' – ' . $guild['name'] . ' (Report)';
+
+    // Ungültige ID -> wie "nicht gewählt" behandeln
+    if (!$guild) {
+        $guildId = 0;
+    } else {
+        $title = $guild['server'] . ' – ' . $guild['name'] . ' (Report)';
+
+        // Stats (Angriffe/Verteidigungen/letzter Import)
+        $st = db()->prepare("
+            SELECT
+                SUM(CASE WHEN battle_type = 'attack'  THEN 1 ELSE 0 END) AS attacks,
+                SUM(CASE WHEN battle_type = 'defense' THEN 1 ELSE 0 END) AS defenses,
+                MAX(battle_date) AS last_import
+            FROM sf_eval_battles
+            WHERE guild_id = ?
+        ");
+        $st->execute([$guildId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $stats['attacks']     = (int)($row['attacks'] ?? 0);
+        $stats['defenses']    = (int)($row['defenses'] ?? 0);
+        $stats['last_import'] = $row['last_import'] ?? null;
+
+        $attack  = sf_eval_stats($guildId, 'attack');
+        $defense = sf_eval_stats($guildId, 'defense');
     }
-
-    // Stats (Angriffe/Verteidigungen/letzter Import)
-    $st = db()->prepare("
-        SELECT
-            SUM(CASE WHEN battle_type = 'attack'  THEN 1 ELSE 0 END) AS attacks,
-            SUM(CASE WHEN battle_type = 'defense' THEN 1 ELSE 0 END) AS defenses,
-            MAX(battle_date) AS last_import
-        FROM sf_eval_battles
-        WHERE guild_id = ?
-    ");
-    $st->execute([$guildId]);
-    $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
-
-    $stats['attacks'] = (int)($row['attacks'] ?? 0);
-    $stats['defenses'] = (int)($row['defenses'] ?? 0);
-    $stats['last_import'] = $row['last_import'] ?? null;
 }
 
 // schöner Zeitstempel (optional)
 $lastImportNice = null;
 if (!empty($stats['last_import'])) {
     try {
-        $dt = new DateTime($stats['last_import']);
+        $dt = new DateTime((string)$stats['last_import']);
         $lastImportNice = $dt->format('d.m.Y');
     } catch (Throwable $e) {
-        $lastImportNice = $stats['last_import'];
+        $lastImportNice = (string)$stats['last_import'];
     }
-}
-
-$attack = null;
-$defense = null;
-
-if ($guildId > 0) {
-    $attack = sf_eval_stats($guildId, 'attack');
-    $defense = sf_eval_stats($guildId, 'defense');
 }
 
 ob_start();
 ?>
-<h2><?= e($title) ?></h2>
+<h1><?= e($title) ?></h1>
 
 <?php
-$importFlag = (string)($_GET['import'] ?? '');
-$importType = (string)($_GET['type'] ?? '');
+$importFlag     = (string)($_GET['import'] ?? '');
+$importType     = (string)($_GET['type'] ?? '');
 $importOpponent = trim((string)($_GET['opponent'] ?? ''));
-$importPlayers = trim((string)($_GET['players'] ?? ''));
+$importPlayers  = trim((string)($_GET['players'] ?? ''));
 
 $importTypeLabel = ($importType === 'attack') ? 'Angriff' : (($importType === 'defense') ? 'Verteidigung' : 'Kampf');
 $details = $importTypeLabel;
@@ -96,9 +103,11 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
   </div>
 <?php endif; ?>
 
-<?php if ($guild): ?>
-  <?php $qid = '?guild_id=' . $guildId; ?>
+<?php
+$qid = ($guildId > 0) ? ('?guild_id=' . $guildId) : '';
+?>
 
+<?php if ($guild): ?>
   <div style="max-width: 900px; margin: 16px 0 18px;">
     <?php if (!empty($guild['crest_file'])): ?>
       <img
@@ -117,42 +126,19 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
       <div style="opacity:.75; margin-top: 6px;">
         Letzter Import: <?= e($lastImportNice) ?>
       </div>
+    <?php endif; ?>
 
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px;">
       <a class="btn" href="<?= e(url('/sf-auswertung/' . $qid)) ?>">Import</a>
       <a class="btn" href="<?= e(url('/sf-auswertung/report.php' . $qid)) ?>">Report</a>
     </div>
   </div>
-
 <?php else: ?>
   <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
     <a class="btn" href="<?= e(url('/sf-auswertung/')) ?>">Import</a>
     <a class="btn" href="<?= e(url('/sf-auswertung/report.php')) ?>">Report</a>
   </div>
 <?php endif; ?>
-
-    <div style="flex:1 1 auto;">
-      <h2 style="margin: 0 0 8px;"><?= e($guild['server']) ?> – <?= e($guild['name']) ?></h2>
-
-      <div style="opacity:.9; margin: 0 0 6px;">
-        <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
-        <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
-      </div>
-
-      <?php if ($lastImportNice): ?>
-        <div style="opacity:.75;">
-          Letzter Import: <?= e($lastImportNice) ?>
-        </div>
-      <?php endif; ?>
-    </div>
-  </div>
-<?php endif; ?>
-
-<div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
-  <?php $qid = ($guildId > 0) ? ('?guild_id=' . $guildId) : ''; ?>
-  <a class="btn" href="<?= e(url('/sf-auswertung/' . $qid)) ?>">Import</a>
-  <a class="btn" href="<?= e(url('/sf-auswertung/report.php' . $qid)) ?>">Report</a>
-</div>
 
 <form method="get" style="margin-bottom: 16px;">
   <label>
@@ -185,32 +171,35 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
 $content = ob_get_clean();
 require __DIR__ . '/../../app/views/layout.php';
 
-function sf_eval_render_table(array $rows): string {
-    if (!$rows) return '<p style="opacity:.85;">Noch keine Daten.</p>';
+function sf_eval_render_table(array $rows): string
+{
+    if (!$rows) {
+        return '<p style="opacity:.85;">Noch keine Daten.</p>';
+    }
 
     $html = '<div style="overflow:auto;"><table class="table">';
     $html .= '<thead><tr>'
-          .  '<th>Spieler</th>'
-          .  '<th style="text-align:right;">Kämpfe</th>'
-          .  '<th style="text-align:right;">Angemeldet</th>'
-          .  '<th style="text-align:right;">Nicht angemeldet</th>'
-          .  '<th style="text-align:right;">%</th>'
-          .  '</tr></thead><tbody>';
+        .  '<th>Spieler</th>'
+        .  '<th style="text-align:right;">Kämpfe</th>'
+        .  '<th style="text-align:right;">Angemeldet</th>'
+        .  '<th style="text-align:right;">Nicht angemeldet</th>'
+        .  '<th style="text-align:right;">%</th>'
+        .  '</tr></thead><tbody>';
 
     foreach ($rows as $r) {
-        $name = htmlspecialchars((string)$r['player_name'], ENT_QUOTES, 'UTF-8');
-        $fights = (int)$r['fights'];
-        $part = (int)$r['participated'];
-        $miss = (int)$r['missed'];
-        $pct = htmlspecialchars((string)$r['pct_participated'], ENT_QUOTES, 'UTF-8');
+        $name  = htmlspecialchars((string)($r['player_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $fights = (int)($r['fights'] ?? 0);
+        $part   = (int)($r['participated'] ?? 0);
+        $miss   = (int)($r['missed'] ?? 0);
+        $pct    = htmlspecialchars((string)($r['pct_participated'] ?? ''), ENT_QUOTES, 'UTF-8');
 
         $html .= '<tr>'
-              .  '<td>' . $name . '</td>'
-              .  '<td style="text-align:right;">' . $fights . '</td>'
-              .  '<td style="text-align:right;">' . $part . '</td>'
-              .  '<td style="text-align:right;">' . $miss . '</td>'
-              .  '<td style="text-align:right;">' . $pct . '</td>'
-              .  '</tr>';
+            .  '<td>' . $name . '</td>'
+            .  '<td style="text-align:right;">' . $fights . '</td>'
+            .  '<td style="text-align:right;">' . $part . '</td>'
+            .  '<td style="text-align:right;">' . $miss . '</td>'
+            .  '<td style="text-align:right;">' . $pct . '</td>'
+            .  '</tr>';
     }
 
     $html .= '</tbody></table></div>';
