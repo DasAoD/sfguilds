@@ -689,19 +689,15 @@ button.danger:hover,
 }
 
 .report-crest {
-	margin: 6px 0 10px;
+	margin: 14px 0 10px;
 }
 
 .report-crest img {
-	max-width: 260px;   /* wie vorher auf der Report-Seite, nahe an “Gildenseite” */
-	width: 100%;
+	max-width: 320px;   /* wenn du’s noch exakt angleichen willst: sag kurz Bescheid */
+	width: auto;
 	height: auto;
 	display: block;
-	border-radius: 12px;
-	border: 1px solid rgba(255, 255, 255, 0.18);
-	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-	background: rgba(255, 255, 255, 0.06);
-	padding: 6px;
+	margin: 0 auto;     /* zentriert wie auf der Gildenseite */
 }
 
 .report-stats {
