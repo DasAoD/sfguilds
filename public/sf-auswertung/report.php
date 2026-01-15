@@ -103,68 +103,45 @@ if ($importPlayers !== '' && ctype_digit($importPlayers)) {
 <?php endif; ?>
 
 <?php
-$qid = ($guildId > 0) ? ('?guild_id=' . $guildId) : '';
+$qid        = ($guildId > 0) ? ('?guild_id=' . $guildId) : '';
 $importHref = url('/sf-auswertung/' . $qid);
 $reportHref = url('/sf-auswertung/report.php' . $qid);
 ?>
 
 <div class="report-head">
-	<div class="report-left">
-		<?php if ($guild && !empty($guild['crest_file'])): ?>
-			<div class="report-crest">
-				<img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>" alt="">
-			</div>
-		<?php endif; ?>
-
-		<div class="report-meta">
-			<h2 class="report-title">
-				<?php if ($guild): ?>
-					<?= e($guild['server']) ?> – <?= e($guild['name']) ?> <span class="muted">(Report)</span>
-				<?php else: ?>
-					SF Auswertung <span class="muted">(Report)</span>
-				<?php endif; ?>
-			</h2>
-
-			<?php if ($guild): ?>
-				<div class="report-stats">
-					<strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
-					<strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
-					<?php if ($lastImportNice): ?>
-						<span class="muted">| Letzter Import: <?= e($lastImportNice) ?></span>
-					<?php endif; ?>
-				</div>
-			<?php endif; ?>
-		</div>
-	</div>
-
-	<div class="report-actions">
-		<a class="btn pill" href="<?= e($importHref) ?>">Import</a>
-		<a class="btn pill active" href="<?= e($reportHref) ?>">Report</a>
-	</div>
-</div>
-
-    <div style="opacity:.9; margin-top: 10px;">
-      <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
-      <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
-    </div>
-
-    <?php if ($lastImportNice): ?>
-      <div style="opacity:.75; margin-top: 6px;">
-        Letzter Import: <?= e($lastImportNice) ?>
+  <div class="report-left">
+    <?php if ($guild && !empty($guild['crest_file'])): ?>
+      <div class="report-crest">
+        <img src="<?= e(url('/uploads/crests/' . $guild['crest_file'])) ?>" alt="">
       </div>
     <?php endif; ?>
 
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px;">
-      <a class="btn" href="<?= e(url('/sf-auswertung/' . $qid)) ?>">Import</a>
-      <a class="btn" href="<?= e(url('/sf-auswertung/report.php' . $qid)) ?>">Report</a>
+    <div class="report-meta">
+      <h2 class="report-title">
+        <?php if ($guild): ?>
+          <?= e($guild['server']) ?> – <?= e($guild['name']) ?> <span class="muted">(Report)</span>
+        <?php else: ?>
+          SF Auswertung <span class="muted">(Report)</span>
+        <?php endif; ?>
+      </h2>
+
+      <?php if ($guild): ?>
+        <div class="report-stats">
+          <strong>Angriffe:</strong> <?= (int)$stats['attacks'] ?> |
+          <strong>Verteidigungen:</strong> <?= (int)$stats['defenses'] ?>
+          <?php if ($lastImportNice): ?>
+            <span class="muted">| Letzter Import: <?= e($lastImportNice) ?></span>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
-<?php else: ?>
-  <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 18px;">
-    <a class="btn" href="<?= e(url('/sf-auswertung/')) ?>">Import</a>
-    <a class="btn" href="<?= e(url('/sf-auswertung/report.php')) ?>">Report</a>
+
+  <div class="report-actions">
+    <a class="btn pill" href="<?= e($importHref) ?>">Import</a>
+    <a class="btn pill active" href="<?= e($reportHref) ?>">Report</a>
   </div>
-<?php endif; ?>
+</div>
 
 <form method="get" style="margin-bottom: 16px;">
   <label>
@@ -213,7 +190,7 @@ function sf_eval_render_table(array $rows): string
         .  '</tr></thead><tbody>';
 
     foreach ($rows as $r) {
-        $name  = htmlspecialchars((string)($r['player_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $name   = htmlspecialchars((string)($r['player_name'] ?? ''), ENT_QUOTES, 'UTF-8');
         $fights = (int)($r['fights'] ?? 0);
         $part   = (int)($r['participated'] ?? 0);
         $miss   = (int)($r['missed'] ?? 0);
