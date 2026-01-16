@@ -921,3 +921,15 @@ button.danger:hover,
   color: var(--sf-text-dim);
   font-size: 13px;
 }
+
+/* SF Report: Dropdown (Select) in Dark-Mode sauber lesbar */
+.sf-filters select.sf-input,
+.sf-filters select.sf-input option {
+  background: #0c0c0e;
+  color: #fff;
+}
+
+.sf-filters select.sf-input {
+  color-scheme: dark;
+  border: 1px solid rgba(255,255,255,.12);
+}
