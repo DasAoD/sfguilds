@@ -19,6 +19,37 @@ function sf_stripos_u(string $haystack, string $needle)
     return stripos($haystack, $needle);
 }
 
+function sf_name_key(string $name): string
+{
+    $s = trim($name);
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower($s, 'UTF-8');
+    }
+    return strtolower($s);
+}
+
+/**
+ * Entfernt EINEN Server-Suffix wie " (s31de)" am Ende des Namens.
+ * (nur wenn es wirklich wie ein Servercode aussieht)
+ */
+function sf_strip_server_suffix(string $name): string
+{
+    $s = trim($name);
+
+    // z.B. "VIDEL (s31de)" -> base "VIDEL"
+    if (preg_match('/\s*\(([^()]*)\)\s*$/u', $s, $m)) {
+        $inside = trim((string)$m[1]);
+
+        // Server-Tag Muster: s + 1-3 Ziffern + 2 Buchstaben (de, us, ...)
+        if (preg_match('/^s\d{1,3}[a-z]{2}$/i', $inside)) {
+            $s = preg_replace('/\s*\([^()]*\)\s*$/u', '', $s);
+            return trim((string)$s);
+        }
+    }
+
+    return $s;
+}
+
 function sf_rank_group($rank): int
 {
     if ($rank === null || $rank === '') {
@@ -56,43 +87,63 @@ function sf_rank_group($rank): int
 }
 
 /**
- * Holt Rank+Level direkt aus der members-Tabelle.
- * Rückgabe: [playerName => ['level' => int, 'rank' => mixed]]
+ * Holt Level+Rank aus members (Roster).
+ * Rückgabe:
+ * [
+ *   'exact' => [ key(name) => ['level'=>int,'rank'=>mixed,'display_name'=>string] ],
+ *   'base'  => [ key(base) => ['level'=>int,'rank'=>mixed,'display_name'=>string] ],
+ * ]
  */
 function sf_fetch_roster_meta(PDO $pdo, int $guildId): array
 {
     $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     if ($driver !== 'sqlite') {
-        return [];
+        return ['exact' => [], 'base' => []];
     }
 
     try {
         $stmt = $pdo->prepare("
-            SELECT name, level, rank
+            SELECT name, level, rank, updated_at
             FROM members
             WHERE guild_id = ?
             ORDER BY updated_at DESC
         ");
         $stmt->execute([$guildId]);
     } catch (Throwable $e) {
-        return [];
+        return ['exact' => [], 'base' => []];
     }
 
-    $meta = [];
-    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $pn = trim((string)($r['name'] ?? ''));
-        if ($pn === '') continue;
+    $exact = [];
+    $base  = [];
 
-        // erster Treffer gewinnt (durch ORDER BY updated_at DESC ist das der aktuellste)
-        if (!isset($meta[$pn])) {
-            $meta[$pn] = [
-                'level' => (int)($r['level'] ?? 0),
-                'rank'  => $r['rank'] ?? null,
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $fullName = trim((string)($r['name'] ?? ''));
+        if ($fullName === '') continue;
+
+        $lvl = (int)($r['level'] ?? 0);
+        $rk  = $r['rank'] ?? null;
+
+        $kExact = sf_name_key($fullName);
+        if (!isset($exact[$kExact])) {
+            $exact[$kExact] = [
+                'level' => $lvl,
+                'rank'  => $rk,
+                'display_name' => $fullName,
+            ];
+        }
+
+        $baseName = sf_strip_server_suffix($fullName);
+        $kBase = sf_name_key($baseName);
+        if (!isset($base[$kBase])) {
+            $base[$kBase] = [
+                'level' => $lvl,
+                'rank'  => $rk,
+                'display_name' => $fullName, // wichtig: Anzeige soll inkl. (s31de) sein
             ];
         }
     }
 
-    return $meta;
+    return ['exact' => $exact, 'base' => $base];
 }
 
 function sf_merge_stats_rows(array $rows, string $prefix, array &$map): void
@@ -212,20 +263,32 @@ $playersMap = [];
 sf_merge_stats_rows((array)($attack['rows'] ?? []), 'a', $playersMap);
 sf_merge_stats_rows((array)($defense['rows'] ?? []), 'v', $playersMap);
 
-$rosterMeta = ($guildId > 0) ? sf_fetch_roster_meta(db(), $guildId) : [];
+// Roster-Meta (members)
+$roster = ($guildId > 0) ? sf_fetch_roster_meta(db(), $guildId) : ['exact' => [], 'base' => []];
+$rosterExact = $roster['exact'];
+$rosterBase  = $roster['base'];
 
-// Safety: rosterMeta nur nutzen, wenn es auch wirklich Spieler aus $playersMap trifft
-if ($rosterMeta) {
-    $playerKeys = array_fill_keys(array_keys($playersMap), true);
+// Safety: Roster nur nutzen, wenn wir mind. 2 Treffer gegen die Stats-Namen haben (über exact oder base)
+if ($guildId > 0 && ($rosterExact || $rosterBase)) {
+    $playerKeys = [];
+    foreach (array_keys($playersMap) as $pn) {
+        $playerKeys[sf_name_key($pn)] = true;
+        $playerKeys[sf_name_key(sf_strip_server_suffix($pn))] = true;
+    }
+
     $hits = 0;
-    foreach ($rosterMeta as $pn => $_) {
-        if (isset($playerKeys[$pn])) {
-            $hits++;
-            if ($hits >= 2) break; // reicht, um "passt" anzunehmen
-        }
+    foreach ($rosterExact as $k => $_) {
+        if (isset($playerKeys[$k])) { $hits++; if ($hits >= 2) break; }
     }
     if ($hits < 2) {
-        $rosterMeta = [];
+        foreach ($rosterBase as $k => $_) {
+            if (isset($playerKeys[$k])) { $hits++; if ($hits >= 2) break; }
+        }
+    }
+
+    if ($hits < 2) {
+        $rosterExact = [];
+        $rosterBase  = [];
     }
 }
 
@@ -285,15 +348,36 @@ foreach ($playersMap as $name => $p) {
         $pct = (int)round(($doneTotal / $total) * 100);
     }
 
-    $level   = (int)($p['level'] ?? 0);
+    $level = (int)($p['level'] ?? 0);
     $rankRaw = $p['rank_raw'] ?? null;
 
-    if (isset($rosterMeta[$name])) {
-        if (!empty($rosterMeta[$name]['level'])) {
-            $level = max($level, (int)$rosterMeta[$name]['level']);
+    // Anzeige-Name: standardmäßig Stats-Name, kann aber aus members kommen (mit (sXXde))
+    $displayName = (string)$name;
+
+    // Match gegen members:
+    $kExact = sf_name_key((string)$name);
+    $kBase  = sf_name_key(sf_strip_server_suffix((string)$name));
+
+    $m = null;
+    if (isset($rosterExact[$kExact])) {
+        $m = $rosterExact[$kExact];
+    } elseif (isset($rosterBase[$kExact])) {
+        $m = $rosterBase[$kExact];
+    } elseif (isset($rosterExact[$kBase])) {
+        $m = $rosterExact[$kBase];
+    } elseif (isset($rosterBase[$kBase])) {
+        $m = $rosterBase[$kBase];
+    }
+
+    if ($m) {
+        if (!empty($m['level'])) {
+            $level = max($level, (int)$m['level']);
         }
-        if (($rosterMeta[$name]['rank'] ?? null) !== null && ($rosterMeta[$name]['rank'] ?? '') !== '') {
-            $rankRaw = $rosterMeta[$name]['rank'];
+        if (($m['rank'] ?? null) !== null && (string)($m['rank'] ?? '') !== '') {
+            $rankRaw = $m['rank'];
+        }
+        if (!empty($m['display_name'])) {
+            $displayName = (string)$m['display_name'];
         }
     }
 
@@ -307,15 +391,18 @@ foreach ($playersMap as $name => $p) {
     }
 
     $row = [
-        'name'       => (string)$name,
-        'level'      => $level,
-        'rank_group' => $rankGroup,
+        'name'         => (string)$name,        // interne ID (Stats)
+        'display_name' => (string)$displayName, // Anzeige (ggf. inkl. (s31de))
+        'level'        => $level,
+        'rank_group'   => $rankGroup,
+
         'a_done'     => $aDone,
         'a_total'    => $aTotal,
         'a_miss'     => $aMiss,
         'v_done'     => $vDone,
         'v_total'    => $vTotal,
         'v_miss'     => $vMiss,
+
         'done_total' => $doneTotal,
         'total'      => $total,
         'missing'    => $missing,
@@ -344,10 +431,10 @@ $dist60  = 0;
 $distBad = 0;
 
 foreach ($playersAll as $p) {
-    $pct = (int)$p['pct'];
-    if ($pct >= 100) {
+    $pPct = (int)$p['pct'];
+    if ($pPct >= 100) {
         $dist100++;
-    } elseif ($pct >= 60) {
+    } elseif ($pPct >= 60) {
         $dist60++;
     } else {
         $distBad++;
@@ -360,7 +447,7 @@ usort($topMissing, function (array $a, array $b): int {
     if ($a['missing'] !== $b['missing']) {
         return $b['missing'] <=> $a['missing'];
     }
-    return strcasecmp($a['name'], $b['name']);
+    return strcasecmp((string)$a['display_name'], (string)$b['display_name']);
 });
 $topMissing = array_slice($topMissing, 0, 5);
 
@@ -373,7 +460,8 @@ if ($onlyMissing) {
 
 if ($q !== '') {
     $players = array_values(array_filter($players, function (array $p) use ($q): bool {
-        return sf_stripos_u((string)$p['name'], $q) !== false;
+        $dn = (string)($p['display_name'] ?? $p['name'] ?? '');
+        return sf_stripos_u($dn, $q) !== false;
     }));
 }
 
@@ -393,12 +481,14 @@ usort($players, function (array $a, array $b): int {
         return $lvB <=> $lvA;
     }
 
-    // 3) Optional weiterhin: fehlende Kämpfe (damit Problemfälle höher stehen)
-    if ($a['missing'] !== $b['missing']) {
-        return $b['missing'] <=> $a['missing'];
+    // 3) Optional: fehlende Kämpfe (damit Problemfälle höher stehen)
+    if ((int)$a['missing'] !== (int)$b['missing']) {
+        return (int)$b['missing'] <=> (int)$a['missing'];
     }
 
-    return strcasecmp($a['name'], $b['name']);
+    $na = (string)($a['display_name'] ?? $a['name'] ?? '');
+    $nb = (string)($b['display_name'] ?? $b['name'] ?? '');
+    return strcasecmp($na, $nb);
 });
 
 // CSV Export (aktueller Filter)
@@ -426,7 +516,8 @@ if ($export === 'csv' && $guildId > 0 && $guild) {
         $pct = (int)$p['pct'] . '%';
         $miss = (int)$p['missing'];
 
-        fputcsv($out, [(string)$p['name'], $a, $v, $g, $pct, (string)$miss]);
+        $dn = (string)($p['display_name'] ?? $p['name'] ?? '');
+        fputcsv($out, [$dn, $a, $v, $g, $pct, (string)$miss]);
     }
 
     fclose($out);
@@ -613,11 +704,9 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
               <?php else: ?>
                 <?php foreach ($players as $p): ?>
                   <?php
-                    $name = (string)$p['name'];
-
+                    $displayName = (string)($p['display_name'] ?? $p['name'] ?? '');
                     $aDone  = (int)$p['a_done'];
                     $aTotal = (int)$p['a_total'];
-
                     $vDone  = (int)$p['v_done'];
                     $vTotal = (int)$p['v_total'];
 
@@ -634,7 +723,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
 
                   <tr
                     class="sf-row"
-                    data-player="<?= e($name) ?>"
+                    data-player="<?= e($displayName) ?>"
                     data-a-done="<?= $aDone ?>"
                     data-a-total="<?= $aTotal ?>"
                     data-v-done="<?= $vDone ?>"
@@ -645,7 +734,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
                     data-pct="<?= $pct ?>"
                   >
                     <td>
-                      <?= e($name) ?>
+                      <?= e($displayName) ?>
                       <?php if (!empty($p['level'])): ?>
                         <span class="sf-mini">(<?= (int)$p['level'] ?>)</span>
                       <?php endif; ?>
@@ -686,7 +775,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
             <div class="sf-list">
               <?php foreach ($topMissing as $row): ?>
                 <div class="sf-item">
-                  <div><?= e((string)$row['name']) ?></div>
+                  <div><?= e((string)$row['display_name']) ?></div>
                   <div class="sf-right"><?= (int)$row['done_total'] ?>/<?= (int)$row['total'] ?></div>
                 </div>
               <?php endforeach; ?>
