@@ -36,11 +36,10 @@ function sf_strip_server_suffix(string $name): string
 {
     $s = trim($name);
 
-    // z.B. "VIDEL (s31de)" -> base "VIDEL"
     if (preg_match('/\s*\(([^()]*)\)\s*$/u', $s, $m)) {
         $inside = trim((string)$m[1]);
 
-        // Server-Tag Muster: s + 1-3 Ziffern + 2 Buchstaben (de, us, ...)
+        // Muster: s + 1-3 Ziffern + 2 Buchstaben
         if (preg_match('/^s\d{1,3}[a-z]{2}$/i', $inside)) {
             $s = preg_replace('/\s*\([^()]*\)\s*$/u', '', $s);
             return trim((string)$s);
@@ -56,12 +55,9 @@ function sf_rank_group($rank): int
         return 2; // default: Mitglied
     }
 
-    // Numeric ranks (best effort)
     if (is_int($rank) || (is_string($rank) && ctype_digit($rank))) {
         $n = (int)$rank;
-
-        // häufige Konventionen: 1=Leader, 2=Officer, 3=Member
-        if ($n === 0 || $n === 1) return 0; // Leader / Anführer
+        if ($n === 0 || $n === 1) return 0; // Leader
         if ($n === 2) return 1;            // Officer
         return 2;                          // Member
     }
@@ -73,25 +69,21 @@ function sf_rank_group($rank): int
         $s = strtolower($s);
     }
 
-    // Leader / Anführer
     if (strpos($s, 'anführ') !== false || strpos($s, 'leiter') !== false || strpos($s, 'leader') !== false || strpos($s, 'master') !== false) {
         return 0;
     }
-
-    // Officer / Offizier
     if (strpos($s, 'offiz') !== false || strpos($s, 'officer') !== false) {
         return 1;
     }
-
     return 2;
 }
 
 /**
- * Holt Level+Rank aus members (Roster).
+ * Holt Roster-Meta aus Tabelle "members" (best effort).
  * Rückgabe:
  * [
- *   'exact' => [ key(name) => ['level'=>int,'rank'=>mixed,'display_name'=>string] ],
- *   'base'  => [ key(base) => ['level'=>int,'rank'=>mixed,'display_name'=>string] ],
+ *   'exact' => [ nameKey => ['display_name'=>string,'level'=>int,'rank'=>mixed,'in_guild'=>bool,'inactive_days'=>?int] ],
+ *   'base'  => [ baseKey => ... ]  // baseKey = Name ohne Server-Suffix
  * ]
  */
 function sf_fetch_roster_meta(PDO $pdo, int $guildId): array
@@ -101,45 +93,165 @@ function sf_fetch_roster_meta(PDO $pdo, int $guildId): array
         return ['exact' => [], 'base' => []];
     }
 
-    try {
-        $stmt = $pdo->prepare("
-            SELECT name, level, rank, updated_at
-            FROM members
-            WHERE guild_id = ?
-            ORDER BY updated_at DESC
-        ");
-        $stmt->execute([$guildId]);
-    } catch (Throwable $e) {
+    // Existiert members?
+    $st = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='members'");
+    if (!$st || !$st->fetchColumn()) {
         return ['exact' => [], 'base' => []];
     }
+
+    // Spalten lesen
+    $cols = [];
+    $sti = $pdo->query("PRAGMA table_info(members)");
+    if ($sti) {
+        foreach ($sti->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+            $cols[] = (string)($r['name'] ?? '');
+        }
+    }
+    $colSet = array_flip($cols);
+
+    // Kandidaten
+    $nameCandidates  = ['name', 'player_name', 'player'];
+    $levelCandidates = ['level', 'player_level', 'lvl'];
+    $rankCandidates  = ['rank', 'guild_rank', 'role', 'guild_role', 'player_rank'];
+
+    $inactiveDaysCandidates = ['inactive_days', 'days_inactive', 'inactivity_days', 'afk_days'];
+    $lastActiveCandidates   = ['last_active', 'last_seen', 'last_online', 'last_login', 'last_activity'];
+
+    $activeFlagCandidates   = ['in_guild', 'is_member', 'is_active', 'active'];
+    $statusCandidates       = ['status', 'member_status'];
+    $leftAtCandidates       = ['left_at', 'kicked_at', 'removed_at', 'ended_at'];
+
+    $updatedCandidates      = ['updated_at', 'imported_at', 'snapshot_date', 'roster_date', 'created_at'];
+
+    // Pflicht: guild_id
+    if (!isset($colSet['guild_id'])) {
+        return ['exact' => [], 'base' => []];
+    }
+
+    $nameCol = null;
+    foreach ($nameCandidates as $c) if (isset($colSet[$c])) { $nameCol = $c; break; }
+
+    $levelCol = null;
+    foreach ($levelCandidates as $c) if (isset($colSet[$c])) { $levelCol = $c; break; }
+
+    $rankCol = null;
+    foreach ($rankCandidates as $c) if (isset($colSet[$c])) { $rankCol = $c; break; }
+
+    if (!$nameCol) {
+        return ['exact' => [], 'base' => []];
+    }
+
+    $inactiveCol = null;
+    foreach ($inactiveDaysCandidates as $c) if (isset($colSet[$c])) { $inactiveCol = $c; break; }
+
+    $lastActiveCol = null;
+    foreach ($lastActiveCandidates as $c) if (isset($colSet[$c])) { $lastActiveCol = $c; break; }
+
+    $activeFlagCol = null;
+    foreach ($activeFlagCandidates as $c) if (isset($colSet[$c])) { $activeFlagCol = $c; break; }
+
+    $statusCol = null;
+    foreach ($statusCandidates as $c) if (isset($colSet[$c])) { $statusCol = $c; break; }
+
+    $leftAtCol = null;
+    foreach ($leftAtCandidates as $c) if (isset($colSet[$c])) { $leftAtCol = $c; break; }
+
+    $tsCol = null;
+    foreach ($updatedCandidates as $c) if (isset($colSet[$c])) { $tsCol = $c; break; }
+
+    $select = [
+        "$nameCol AS name",
+        ($levelCol ? "$levelCol AS level" : "NULL AS level"),
+        ($rankCol ? "$rankCol AS rank" : "NULL AS rank"),
+        ($inactiveCol ? "$inactiveCol ASA inactive_days" : "NULL AS inactive_days"),
+        ($lastActiveCol ? "$lastActiveCol AS last_active" : "NULL AS last_active"),
+        ($activeFlagCol ? "$activeFlagCol AS active_flag" : "NULL AS active_flag"),
+        ($statusCol ? "$statusCol AS status" : "NULL AS status"),
+        ($leftAtCol ? "$leftAtCol AS left_at" : "NULL AS left_at"),
+    ];
+
+    // SQLite: "AS" Tippfehler vermeiden, wenn oben mal falsch getippt wurde (Safety)
+    $select = array_map(static function ($s) {
+        return str_replace(' AS', ' AS', str_replace('A inactive_days', 'AS inactive_days', $s));
+    }, $select);
+
+    $sql = "SELECT " . implode(", ", $select) . " FROM members WHERE guild_id = ?";
+    if ($tsCol) {
+        $sql .= " ORDER BY $tsCol DESC";
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$guildId]);
 
     $exact = [];
     $base  = [];
 
     while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $fullName = trim((string)($r['name'] ?? ''));
-        if ($fullName === '') continue;
+        $displayName = trim((string)($r['name'] ?? ''));
+        if ($displayName === '') continue;
 
-        $lvl = (int)($r['level'] ?? 0);
-        $rk  = $r['rank'] ?? null;
+        // Mitglied-Status bestimmen
+        $inGuild = true;
 
-        $kExact = sf_name_key($fullName);
-        if (!isset($exact[$kExact])) {
-            $exact[$kExact] = [
-                'level' => $lvl,
-                'rank'  => $rk,
-                'display_name' => $fullName,
-            ];
+        if (($r['left_at'] ?? null) !== null && (string)$r['left_at'] !== '') {
+            $inGuild = false;
         }
 
-        $baseName = sf_strip_server_suffix($fullName);
+        if (($r['active_flag'] ?? null) !== null && (string)$r['active_flag'] !== '') {
+            $inGuild = ((int)$r['active_flag']) !== 0;
+        }
+
+        if (($r['status'] ?? null) !== null && (string)$r['status'] !== '') {
+            $s = (string)$r['status'];
+            $s = function_exists('mb_strtolower') ? mb_strtolower($s, 'UTF-8') : strtolower($s);
+            if (
+                strpos($s, 'kicked') !== false ||
+                strpos($s, 'kick') !== false ||
+                strpos($s, 'left') !== false ||
+                strpos($s, 'verlass') !== false ||
+                strpos($s, 'entlass') !== false ||
+                strpos($s, 'removed') !== false ||
+                strpos($s, 'former') !== false ||
+                strpos($s, 'ex') !== false
+            ) {
+                $inGuild = false;
+            }
+        }
+
+        // Inaktivität bestimmen
+        $inactiveDays = null;
+
+        if (($r['inactive_days'] ?? null) !== null && (string)$r['inactive_days'] !== '') {
+            $inactiveDays = (int)$r['inactive_days'];
+            if ($inactiveDays < 0) $inactiveDays = 0;
+        } elseif (($r['last_active'] ?? null) !== null && (string)$r['last_active'] !== '') {
+            try {
+                $dt  = new DateTime((string)$r['last_active']);
+                $now = new DateTime('now');
+                $inactiveDays = (int)$now->diff($dt)->days;
+                if ($inactiveDays < 0) $inactiveDays = 0;
+            } catch (Throwable $e) {
+                $inactiveDays = null;
+            }
+        }
+
+        $meta = [
+            'display_name'  => $displayName,
+            'level'         => (int)($r['level'] ?? 0),
+            'rank'          => $r['rank'] ?? null,
+            'in_guild'      => $inGuild,
+            'inactive_days' => $inactiveDays,
+        ];
+
+        $kExact = sf_name_key($displayName);
+        if (!isset($exact[$kExact])) {
+            $exact[$kExact] = $meta;
+        }
+
+        $baseName = sf_strip_server_suffix($displayName);
         $kBase = sf_name_key($baseName);
         if (!isset($base[$kBase])) {
-            $base[$kBase] = [
-                'level' => $lvl,
-                'rank'  => $rk,
-                'display_name' => $fullName, // wichtig: Anzeige soll inkl. (s31de) sein
-            ];
+            $base[$kBase] = $meta;
         }
     }
 
@@ -150,27 +262,19 @@ function sf_merge_stats_rows(array $rows, string $prefix, array &$map): void
 {
     foreach ($rows as $r) {
         $name = trim((string)($r['player_name'] ?? ''));
-        if ($name === '') {
-            continue;
-        }
+        if ($name === '') continue;
 
         if (!isset($map[$name])) {
             $map[$name] = [
                 'name'        => $name,
                 'level'       => 0,
                 'rank_raw'    => null,
-
                 'a_done'      => 0,
                 'a_total'     => 0,
                 'a_miss'      => 0,
                 'v_done'      => 0,
                 'v_total'     => 0,
                 'v_miss'      => 0,
-                'done_total'  => 0,
-                'total'       => 0,
-                'missing'     => 0,
-                'pct'         => 0,
-                'cls'         => 'good',
             ];
         }
 
@@ -182,7 +286,6 @@ function sf_merge_stats_rows(array $rows, string $prefix, array &$map): void
         $map[$name][$prefix . '_miss']  = max(0, $miss);
         $map[$name][$prefix . '_total'] = max(0, $total);
 
-        // optional: level/rank aus Stats-Row übernehmen, falls vorhanden
         $lvl = (int)($r['level'] ?? ($r['player_level'] ?? 0));
         if ($lvl > (int)$map[$name]['level']) {
             $map[$name]['level'] = $lvl;
@@ -215,18 +318,15 @@ $attack  = null;
 $defense = null;
 
 if ($guildId > 0) {
-    // Guild-Infos
     $st = db()->prepare("SELECT id, name, server, crest_file FROM guilds WHERE id = ?");
     $st->execute([$guildId]);
     $guild = $st->fetch(PDO::FETCH_ASSOC) ?: null;
 
-    // Ungültige ID -> wie "nicht gewählt" behandeln
     if (!$guild) {
         $guildId = 0;
     } else {
         $title = $guild['server'] . ' – ' . $guild['name'] . ' (Report)';
 
-        // Stats (Angriffe/Verteidigungen/letzter Import)
         $st = db()->prepare("
             SELECT
                 SUM(CASE WHEN battle_type = 'attack'  THEN 1 ELSE 0 END) AS attacks,
@@ -247,7 +347,6 @@ if ($guildId > 0) {
     }
 }
 
-// schöner Zeitstempel (optional)
 $lastImportNice = null;
 if (!empty($stats['last_import'])) {
     try {
@@ -258,67 +357,66 @@ if (!empty($stats['last_import'])) {
     }
 }
 
-// Spieler zusammenführen (Angriff + Verteidigung)
+// Spieler zusammenführen
 $playersMap = [];
 sf_merge_stats_rows((array)($attack['rows'] ?? []), 'a', $playersMap);
 sf_merge_stats_rows((array)($defense['rows'] ?? []), 'v', $playersMap);
 
-// Roster-Meta (members)
-$roster = ($guildId > 0) ? sf_fetch_roster_meta(db(), $guildId) : ['exact' => [], 'base' => []];
-$rosterExact = $roster['exact'];
-$rosterBase  = $roster['base'];
+// Roster laden
+$rosterExact = [];
+$rosterBase  = [];
+$rosterUsable = false;
 
-// Safety: Roster nur nutzen, wenn wir mind. 2 Treffer gegen die Stats-Namen haben (über exact oder base)
-if ($guildId > 0 && ($rosterExact || $rosterBase)) {
-    $playerKeys = [];
-    foreach (array_keys($playersMap) as $pn) {
-        $playerKeys[sf_name_key($pn)] = true;
-        $playerKeys[sf_name_key(sf_strip_server_suffix($pn))] = true;
-    }
+if ($guildId > 0) {
+    $roster = sf_fetch_roster_meta(db(), $guildId);
+    $rosterExact = $roster['exact'] ?? [];
+    $rosterBase  = $roster['base'] ?? [];
 
-    $hits = 0;
-    foreach ($rosterExact as $k => $_) {
-        if (isset($playerKeys[$k])) { $hits++; if ($hits >= 2) break; }
-    }
-    if ($hits < 2) {
-        foreach ($rosterBase as $k => $_) {
+    // Safety: nur nutzen, wenn mind. 2 Treffer gegen Stats-Namen
+    if ($rosterExact || $rosterBase) {
+        $playerKeys = [];
+        foreach (array_keys($playersMap) as $pn) {
+            $playerKeys[sf_name_key($pn)] = true;
+            $playerKeys[sf_name_key(sf_strip_server_suffix($pn))] = true;
+        }
+
+        $hits = 0;
+        foreach ($rosterExact as $k => $_) {
             if (isset($playerKeys[$k])) { $hits++; if ($hits >= 2) break; }
         }
-    }
+        if ($hits < 2) {
+            foreach ($rosterBase as $k => $_) {
+                if (isset($playerKeys[$k])) { $hits++; if ($hits >= 2) break; }
+            }
+        }
 
-    if ($hits < 2) {
-        $rosterExact = [];
-        $rosterBase  = [];
+        if ($hits >= 2) {
+            $rosterUsable = true;
+        } else {
+            $rosterExact = [];
+            $rosterBase  = [];
+        }
     }
 }
 
 $attacksTotal  = (int)$stats['attacks'];
 $defensesTotal = (int)$stats['defenses'];
 
-// Falls fights in Rows verlässlicher ist (z. B. stats=0), versuchen wir daraus zu nehmen
 if ($attacksTotal <= 0) {
     foreach ($playersMap as $p) {
-        if (!empty($p['a_total'])) {
-            $attacksTotal = (int)$p['a_total'];
-            break;
-        }
+        if (!empty($p['a_total'])) { $attacksTotal = (int)$p['a_total']; break; }
     }
 }
 if ($defensesTotal <= 0) {
     foreach ($playersMap as $p) {
-        if (!empty($p['v_total'])) {
-            $defensesTotal = (int)$p['v_total'];
-            break;
-        }
+        if (!empty($p['v_total'])) { $defensesTotal = (int)$p['v_total']; break; }
     }
 }
 
 $totalFights = max(0, $attacksTotal + $defensesTotal);
 
-// Finalisieren: Totals, Quote, Klassen
+// Finalisieren
 $playersAll = [];
-$sumDoneTotal = 0;
-$missingPlayersCount = 0;
 
 foreach ($playersMap as $name => $p) {
     $aDone  = (int)($p['a_done'] ?? 0);
@@ -327,74 +425,68 @@ foreach ($playersMap as $name => $p) {
     $aTotal = $attacksTotal > 0 ? $attacksTotal : (int)($p['a_total'] ?? 0);
     $vTotal = $defensesTotal > 0 ? $defensesTotal : (int)($p['v_total'] ?? 0);
 
-    // Falls missed nicht geliefert wurde, ableiten
     $aMiss = (int)($p['a_miss'] ?? 0);
     $vMiss = (int)($p['v_miss'] ?? 0);
 
-    if ($aMiss <= 0 && $aTotal > 0) {
-        $aMiss = max(0, $aTotal - $aDone);
-    }
-    if ($vMiss <= 0 && $vTotal > 0) {
-        $vMiss = max(0, $vTotal - $vDone);
-    }
+    if ($aMiss <= 0 && $aTotal > 0) $aMiss = max(0, $aTotal - $aDone);
+    if ($vMiss <= 0 && $vTotal > 0) $vMiss = max(0, $vTotal - $vDone);
 
     $total = max(0, $aTotal + $vTotal);
     $doneTotal = max(0, $aDone + $vDone);
-
     $missing = max(0, $total - $doneTotal);
 
     $pct = 0;
-    if ($total > 0) {
-        $pct = (int)round(($doneTotal / $total) * 100);
-    }
+    if ($total > 0) $pct = (int)round(($doneTotal / $total) * 100);
 
     $level = (int)($p['level'] ?? 0);
     $rankRaw = $p['rank_raw'] ?? null;
-
-    // Anzeige-Name: standardmäßig Stats-Name, kann aber aus members kommen (mit (sXXde))
     $displayName = (string)$name;
 
-    // Match gegen members:
-    $kExact = sf_name_key((string)$name);
-    $kBase  = sf_name_key(sf_strip_server_suffix((string)$name));
+    $rosterFound = false;
+    $inGuild = true;
+    $inactiveDays = null;
+    $inactive = false;
 
-    $m = null;
-    if (isset($rosterExact[$kExact])) {
-        $m = $rosterExact[$kExact];
-    } elseif (isset($rosterBase[$kExact])) {
-        $m = $rosterBase[$kExact];
-    } elseif (isset($rosterExact[$kBase])) {
-        $m = $rosterExact[$kBase];
-    } elseif (isset($rosterBase[$kBase])) {
-        $m = $rosterBase[$kBase];
-    }
+    if ($rosterUsable) {
+        $kExact = sf_name_key((string)$name);
+        $kBase  = sf_name_key(sf_strip_server_suffix((string)$name));
 
-    if ($m) {
-        if (!empty($m['level'])) {
-            $level = max($level, (int)$m['level']);
-        }
-        if (($m['rank'] ?? null) !== null && (string)($m['rank'] ?? '') !== '') {
-            $rankRaw = $m['rank'];
-        }
-        if (!empty($m['display_name'])) {
-            $displayName = (string)$m['display_name'];
+        $m = null;
+        if (isset($rosterExact[$kExact])) $m = $rosterExact[$kExact];
+        elseif (isset($rosterBase[$kExact])) $m = $rosterBase[$kExact];
+        elseif (isset($rosterExact[$kBase])) $m = $rosterExact[$kBase];
+        elseif (isset($rosterBase[$kBase])) $m = $rosterBase[$kBase];
+
+        if ($m) {
+            $rosterFound = true;
+
+            if (!empty($m['level'])) $level = max($level, (int)$m['level']);
+            if (($m['rank'] ?? null) !== null && (string)($m['rank'] ?? '') !== '') $rankRaw = $m['rank'];
+            if (!empty($m['display_name'])) $displayName = (string)$m['display_name'];
+
+            $inGuild = (bool)($m['in_guild'] ?? true);
+            $inactiveDays = $m['inactive_days'] ?? null;
+
+            $inactive = (is_int($inactiveDays) && $inactiveDays >= 7);
         }
     }
 
     $rankGroup = sf_rank_group($rankRaw);
 
     $cls = 'good';
-    if ($pct < 60) {
-        $cls = 'bad';
-    } elseif ($pct < 100) {
-        $cls = 'warn';
-    }
+    if ($pct < 60) $cls = 'bad';
+    elseif ($pct < 100) $cls = 'warn';
 
-    $row = [
-        'name'         => (string)$name,        // interne ID (Stats)
-        'display_name' => (string)$displayName, // Anzeige (ggf. inkl. (s31de))
+    $playersAll[] = [
+        'name'         => (string)$name,
+        'display_name' => (string)$displayName,
         'level'        => $level,
         'rank_group'   => $rankGroup,
+
+        'roster_found' => $rosterFound,
+        'in_guild'     => $inGuild,
+        'inactive_days'=> $inactiveDays,
+        'inactive'     => $inactive,
 
         'a_done'     => $aDone,
         'a_total'    => $aTotal,
@@ -409,16 +501,26 @@ foreach ($playersMap as $name => $p) {
         'pct'        => $pct,
         'cls'        => $cls,
     ];
-
-    $playersAll[] = $row;
-
-    $sumDoneTotal += $doneTotal;
-    if ($missing > 0) {
-        $missingPlayersCount++;
-    }
 }
 
-// KPI: Quote über alle Spieler
+// Ex-Mitglieder raus (nur wenn Roster wirklich nutzbar ist)
+if ($rosterUsable) {
+    $playersAll = array_values(array_filter($playersAll, function (array $p): bool {
+        if (empty($p['roster_found'])) return false; // nicht im Roster -> raus
+        if (empty($p['in_guild'])) return false;     // explizit raus -> raus
+        return true;
+    }));
+}
+
+// KPIs nach Filter neu berechnen
+$sumDoneTotal = 0;
+$missingPlayersCount = 0;
+
+foreach ($playersAll as $p) {
+    $sumDoneTotal += (int)$p['done_total'];
+    if ((int)$p['missing'] > 0) $missingPlayersCount++;
+}
+
 $quote = 0;
 $countPlayersAll = count($playersAll);
 if ($countPlayersAll > 0 && $totalFights > 0) {
@@ -432,26 +534,22 @@ $distBad = 0;
 
 foreach ($playersAll as $p) {
     $pPct = (int)$p['pct'];
-    if ($pPct >= 100) {
-        $dist100++;
-    } elseif ($pPct >= 60) {
-        $dist60++;
-    } else {
-        $distBad++;
-    }
+    if ($pPct >= 100) $dist100++;
+    elseif ($pPct >= 60) $dist60++;
+    else $distBad++;
 }
 
-// Top fehlende (global, unabhängig von Filter)
-$topMissing = $playersAll;
+// Top Nicht teilgenommen
+$topMissing = array_values(array_filter($playersAll, fn(array $p): bool => (int)$p['missing'] > 0));
+if (!$topMissing) $topMissing = $playersAll;
+
 usort($topMissing, function (array $a, array $b): int {
-    if ($a['missing'] !== $b['missing']) {
-        return $b['missing'] <=> $a['missing'];
-    }
+    if ((int)$a['missing'] !== (int)$b['missing']) return (int)$b['missing'] <=> (int)$a['missing'];
     return strcasecmp((string)$a['display_name'], (string)$b['display_name']);
 });
 $topMissing = array_slice($topMissing, 0, 5);
 
-// Filter (nur in der Tabelle/Export)
+// Filter (nur Tabelle/Export)
 $players = $playersAll;
 
 if ($onlyMissing) {
@@ -465,33 +563,35 @@ if ($q !== '') {
     }));
 }
 
-// Sort: zuerst nach Gildenrang, dann nach Level
+// Sort: Rang -> Level -> missing -> Name
 usort($players, function (array $a, array $b): int {
-    // 1) Ranggruppe: Leader (0) -> Officer (1) -> Member (2)
     $rgA = (int)($a['rank_group'] ?? 2);
     $rgB = (int)($b['rank_group'] ?? 2);
-    if ($rgA !== $rgB) {
-        return $rgA <=> $rgB;
-    }
+    if ($rgA !== $rgB) return $rgA <=> $rgB;
 
-    // 2) Level absteigend
     $lvA = (int)($a['level'] ?? 0);
     $lvB = (int)($b['level'] ?? 0);
-    if ($lvA !== $lvB) {
-        return $lvB <=> $lvA;
-    }
+    if ($lvA !== $lvB) return $lvB <=> $lvA;
 
-    // 3) Optional: fehlende Kämpfe (damit Problemfälle höher stehen)
-    if ((int)$a['missing'] !== (int)$b['missing']) {
-        return (int)$b['missing'] <=> (int)$a['missing'];
-    }
+    if ((int)$a['missing'] !== (int)$b['missing']) return (int)$b['missing'] <=> (int)$a['missing'];
 
     $na = (string)($a['display_name'] ?? $a['name'] ?? '');
     $nb = (string)($b['display_name'] ?? $b['name'] ?? '');
     return strcasecmp($na, $nb);
 });
 
-// CSV Export (aktueller Filter)
+// Inaktive (>= 7 Tage) nach unten
+$playersActive = [];
+$playersInactive = [];
+
+foreach ($players as $p) {
+    if (!empty($p['inactive'])) $playersInactive[] = $p;
+    else $playersActive[] = $p;
+}
+
+$playersForExport = array_merge($playersActive, $playersInactive);
+
+// CSV Export
 if ($export === 'csv' && $guildId > 0 && $guild) {
     $safeGuild = preg_replace('/[^a-zA-Z0-9_-]+/', '-', (string)$guild['name']);
     $safeSrv   = preg_replace('/[^a-zA-Z0-9_-]+/', '-', (string)$guild['server']);
@@ -503,13 +603,12 @@ if ($export === 'csv' && $guildId > 0 && $guild) {
     header('Pragma: no-cache');
     header('Expires: 0');
 
-    // UTF-8 BOM (Excel-freundlich)
     echo "\xEF\xBB\xBF";
 
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['Spieler', 'Angriffe', 'Verteidigungen', 'Gesamt', 'Quote', 'Fehlend']);
+    fputcsv($out, ['Spieler', 'Angriffe', 'Verteidigungen', 'Gesamt', 'Quote', 'Nicht teilgenommen']);
 
-    foreach ($players as $p) {
+    foreach ($playersForExport as $p) {
         $a = (int)$p['a_done'] . '/' . (int)$p['a_total'];
         $v = (int)$p['v_done'] . '/' . (int)$p['v_total'];
         $g = (int)$p['done_total'] . '/' . (int)$p['total'];
@@ -517,6 +616,10 @@ if ($export === 'csv' && $guildId > 0 && $guild) {
         $miss = (int)$p['missing'];
 
         $dn = (string)($p['display_name'] ?? $p['name'] ?? '');
+        if (!empty($p['level'])) {
+            $dn .= ' (' . (int)$p['level'] . ')';
+        }
+
         fputcsv($out, [$dn, $a, $v, $g, $pct, (string)$miss]);
     }
 
@@ -564,12 +667,8 @@ $reportHref = url('/sf-auswertung/report.php' . $qid);
 $formParams = [
     'guild_id' => $guildId > 0 ? $guildId : 0,
 ];
-if ($onlyMissing) {
-    $formParams['missing'] = 1;
-}
-if ($q !== '') {
-    $formParams['q'] = $q;
-}
+if ($onlyMissing) $formParams['missing'] = 1;
+if ($q !== '') $formParams['q'] = $q;
 
 $exportParams = $formParams;
 $exportParams['export'] = 'csv';
@@ -658,7 +757,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
         <div class="sf-card">
           <div class="sf-kpi-label">Verteidigungen</div>
           <div class="sf-kpi-value"><?= (int)$defensesTotal ?></div>
-          <div class="sf-kpi-hint">Kämpfe je Spieler</div>
+          <div class="sf-kpi-h_unpacking?sfguilds`?`int">Kämpfe je Spieler</div>
         </div>
 
         <div class="sf-card">
@@ -668,9 +767,9 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
         </div>
 
         <div class="sf-card">
-          <div class="sf-kpi-label">Fehlende</div>
+          <div class="sf-kpi-label">Nicht teilgenommen</div>
           <div class="sf-kpi-value"><?= (int)$missingPlayersCount ?></div>
-          <div class="sf-kpi-hint bad">Nicht teilgenommen</div>
+          <div class="sf-kpi-hint bad">Spieler mit Lücke</div>
         </div>
       </div>
 
@@ -681,7 +780,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
             <div>
               <h3>Spieler (kompakt)</h3>
               <div class="sf-table-note">
-                Sortierung: Rang (Anführer/Offiziere/Mitglieder), dann Level · Klick auf Zeile = Details · Anzeige: <strong><?= (int)count($players) ?></strong> Spieler
+                Sortierung: Rang, dann Level · Inaktive (≥ 7 Tage) ganz unten · Klick auf Zeile = Details · Anzeige: <strong><?= (int)count($playersForExport) ?></strong> Spieler
               </div>
             </div>
           </div>
@@ -697,22 +796,21 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
               </tr>
             </thead>
             <tbody>
-              <?php if (!$players): ?>
+              <?php if (!$playersForExport): ?>
                 <tr>
                   <td colspan="5" style="opacity:.8;">Keine Treffer (Filter zu streng?).</td>
                 </tr>
               <?php else: ?>
-                <?php foreach ($players as $p): ?>
+
+                <?php foreach ($playersActive as $p): ?>
                   <?php
                     $displayName = (string)($p['display_name'] ?? $p['name'] ?? '');
                     $aDone  = (int)$p['a_done'];
                     $aTotal = (int)$p['a_total'];
                     $vDone  = (int)$p['v_done'];
                     $vTotal = (int)$p['v_total'];
-
                     $done   = (int)$p['done_total'];
                     $total  = (int)$p['total'];
-
                     $miss   = (int)$p['missing'];
                     $pct    = (int)$p['pct'];
                     $cls    = (string)$p['cls'];
@@ -752,8 +850,70 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
                       <div class="sf-mini" style="margin-top:6px; text-align:right;"><?= $pct ?>%</div>
                     </td>
                   </tr>
-
                 <?php endforeach; ?>
+
+                <?php if ($playersInactive): ?>
+                  <tr class="sf-sep">
+                    <td colspan="5" style="padding:10px 12px; opacity:.85; font-weight:800;">
+                      Inaktiv (ab 7 Tagen)
+                    </td>
+                  </tr>
+
+                  <?php foreach ($playersInactive as $p): ?>
+                    <?php
+                      $displayName = (string)($p['display_name'] ?? $p['name'] ?? '');
+                      $aDone  = (int)$p['a_done'];
+                      $aTotal = (int)$p['a_total'];
+                      $vDone  = (int)$p['v_done'];
+                      $vTotal = (int)$p['v_total'];
+                      $done   = (int)$p['done_total'];
+                      $total  = (int)$p['total'];
+                      $miss   = (int)$p['missing'];
+                      $pct    = (int)$p['pct'];
+                      $cls    = (string)$p['cls'];
+
+                      $aCls = ($aTotal > 0 && $aDone >= $aTotal) ? 'good' : (($aDone <= 0) ? 'bad' : 'warn');
+                      $vCls = ($vTotal > 0 && $vDone >= $vTotal) ? 'good' : (($vDone <= 0) ? 'bad' : 'warn');
+
+                      $idays = $p['inactive_days'] ?? null;
+                      $inactiveLabel = (is_int($idays) ? ('Inaktiv: ' . $idays . 'd') : 'Inaktiv');
+                    ?>
+
+                    <tr
+                      class="sf-row"
+                      data-player="<?= e($displayName) ?>"
+                      data-a-done="<?= $aDone ?>"
+                      data-a-total="<?= $aTotal ?>"
+                      data-v-done="<?= $vDone ?>"
+                      data-v-total="<?= $vTotal ?>"
+                      data-done="<?= $done ?>"
+                      data-total="<?= $total ?>"
+                      data-miss="<?= $miss ?>"
+                      data-pct="<?= $pct ?>"
+                    >
+                      <td>
+                        <?= e($displayName) ?>
+                        <?php if (!empty($p['level'])): ?>
+                          <span class="sf-mini">(<?= (int)$p['level'] ?>)</span>
+                        <?php endif; ?>
+                        <span class="sf-mini" style="margin-left:10px; opacity:.75;"><?= e($inactiveLabel) ?></span>
+                        <?php if ($miss > 0): ?>
+                          <span style="margin-left:10px" class="sf-miss-badge">-<?= $miss ?></span>
+                        <?php endif; ?>
+                      </td>
+
+                      <td class="sf-num <?= e($aCls) ?>"><?= $aDone ?>/<?= $aTotal ?></td>
+                      <td class="sf-num <?= e($vCls) ?>"><?= $vDone ?>/<?= $vTotal ?></td>
+                      <td class="sf-num <?= e($cls) ?>"><?= $done ?>/<?= $total ?></td>
+
+                      <td>
+                        <div class="sf-progress <?= e($cls) ?>"><span style="width: <?= $pct ?>%"></span></div>
+                        <div class="sf-mini" style="margin-top:6px; text-align:right;"><?= $pct ?>%</div>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+
               <?php endif; ?>
             </tbody>
           </table>
@@ -767,14 +927,14 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
 
           <div class="sf-card">
             <div style="display:flex; align-items:center; justify-content:space-between;">
-              <div style="font-weight:700;">Top-Fehlende</div>
+              <div style="font-weight:700;">Top Nicht teilgenommen</div>
               <div class="sf-mini"><?= (int)$totalFights ?> möglich</div>
             </div>
 
             <div class="sf-list">
               <?php foreach ($topMissing as $row): ?>
                 <div class="sf-item">
-                  <div><?= e((string)$row['display_name']) ?></div>
+                  <div><?= e((string)($row['display_name'] ?? $row['name'] ?? '')) ?></div>
                   <div class="sf-right"><?= (int)$row['done_total'] ?>/<?= (int)$row['total'] ?></div>
                 </div>
               <?php endforeach; ?>
@@ -800,19 +960,19 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
           </div>
 
           <div class="sf-card">
-              <div style="font-weight:700;">Aktion</div>
-              <div class="sf-list">
-                  <div class="sf-item">
-                      <div>Export CSV</div>
-                      <div class="sf-right" style="color:#7aa7ff;">
-                          <a class="btn" href="<?= e($exportHref) ?>" style="padding:6px 10px; border-radius:999px;">Download</a>
-                      </div>
-                  </div>
+            <div style="font-weight:700;">Aktion</div>
+            <div class="sf-list">
+              <div class="sf-item">
+                <div>Export CSV</div>
+                <div class="sf-right" style="color:#7aa7ff;">
+                  <a class="btn" href="<?= e($exportHref) ?>" style="padding:6px 10px; border-radius:999px;">Download</a>
+                </div>
               </div>
+            </div>
           </div>
-            
+
         </div>
-          
+
       </div>
 
       <!-- Details Modal -->
@@ -840,7 +1000,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
               <div id="pdG" class="sf-kpi-value" style="font-size:26px;">0/0</div>
             </div>
             <div class="sf-card" style="padding:12px;">
-              <div class="sf-kpi-label">Fehlend</div>
+              <div class="sf-kpi-label">Nicht teilgenommen</div>
               <div id="pdM" class="sf-kpi-value" style="font-size:26px;">0</div>
             </div>
           </div>
@@ -913,7 +1073,6 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
       </script>
 
     <?php endif; ?>
-
   <?php endif; ?>
 
 </div>
