@@ -12,8 +12,8 @@ if (function_exists('isAdmin') && !isAdmin()) {
 	exit;
 }
 
-$perGuildLimit = 200;   // Einträge pro Gilde anzeigen
-$scanLimit     = 5000;  // wie viele Battles insgesamt scannen
+$perGuildLimit = 200;  // Einträge pro Gilde anzeigen
+$scanLimit     = 5000; // wie viele Battles insgesamt scannen
 
 // --- PDO finden oder fallback auf SQLite-Datei
 $pdo = null;
@@ -33,49 +33,6 @@ if (!$pdo) {
 	]);
 }
 
-// --- Helpers
-$pickColumn = static function(array $cols, array $candidates): ?string {
-	$set = array_fill_keys($cols, true);
-	foreach ($candidates as $c) {
-		if (isset($set[$c])) return $c;
-	}
-	return null;
-};
-
-$fmtWhen = static function($v): string {
-	if ($v === null) return '';
-	// numeric epoch?
-	if (is_int($v) || (is_string($v) && ctype_digit($v))) {
-		$n = (int)$v;
-		// ms epoch?
-		if ($n > 2000000000000) $n = (int) floor($n / 1000);
-		if ($n > 1000000000) return date('d.m.Y H:i', $n);
-	}
-	$ts = strtotime((string)$v);
-	if ($ts !== false) return date('d.m.Y H:i', $ts);
-	return (string)$v;
-};
-
-$kindFromType = static function(string $colName, $typeVal): string {
-	$v = is_string($typeVal) ? strtolower(trim($typeVal)) : $typeVal;
-
-	if (is_string($v)) {
-		if (in_array($v, ['attack','att','a','angriff','offense','off'], true)) return 'Angriff';
-		if (in_array($v, ['defense','def','d','verteidigung','defence'], true)) return 'Verteidigung';
-	}
-
-	$isNum = is_int($v) || is_float($v) || (is_string($v) && is_numeric($v));
-	if ($isNum) {
-		$n = (int)$v;
-		$cn = strtolower($colName);
-		if (str_contains($cn, 'attack'))  return $n === 1 ? 'Angriff' : 'Verteidigung';
-		if (str_contains($cn, 'def'))     return $n === 1 ? 'Verteidigung' : 'Angriff';
-		return $n === 1 ? 'Angriff' : 'Verteidigung';
-	}
-
-	return 'Kampf';
-};
-
 // --- Gilden laden
 $guilds = $pdo->query("SELECT id, name FROM guilds ORDER BY name")->fetchAll();
 
@@ -87,27 +44,38 @@ foreach ($guilds as $g) {
 	$counts[$gid] = 0;
 }
 
-// --- Spalten erkennen
+// --- Spalten prüfen (damit die Seite nicht crasht, falls Schema mal abweicht)
 $info = $pdo->query("PRAGMA table_info(sf_eval_battles)")->fetchAll();
 $cols = array_map(static fn($r) => (string)$r['name'], $info);
 
-$tsCol = $pickColumn($cols, [
-	'battle_at','battle_time','occurred_at','started_at','ended_at',
-	'created_at','timestamp','ts','time','datetime','date'
-]) ?: 'rowid';
+$need = ['guild_id', 'battle_type', 'battle_date', 'battle_time'];
+$hasAll = true;
+foreach ($need as $c) {
+	if (!in_array($c, $cols, true)) { $hasAll = false; break; }
+}
 
-$attCol = $pickColumn($cols, ['attacker_guild_id','attacker_id','guild_attacker_id','atk_guild_id','atk_id']);
-$defCol = $pickColumn($cols, ['defender_guild_id','defender_id','guild_defender_id','def_guild_id','def_id']);
+$mapType = static function(string $t): string {
+	$t = strtolower(trim($t));
+	if ($t === 'attack') return 'Angriff';
+	if ($t === 'defense') return 'Verteidigung';
+	return 'Kampf';
+};
 
-$guildCol = $pickColumn($cols, ['guild_id','guild']);
-$typeCol  = $pickColumn($cols, ['kind','type','direction','is_attack','is_defense','is_defend','attack','defense']);
+$fmtWhen = static function(string $date, string $time): string {
+	// DB: 2026-01-16 + 17:45 -> Anzeige: 16.01.2026 17:45
+	$dt = DateTime::createFromFormat('Y-m-d H:i', $date . ' ' . $time);
+	if ($dt instanceof DateTime) return $dt->format('d.m.Y H:i');
+	// fallback
+	return trim($date . ' ' . $time);
+};
 
-// --- Daten holen & pro Gilde einsortieren
-if ($attCol && $defCol) {
-	$sql = "SELECT $tsCol AS ts, $attCol AS a, $defCol AS d
-	        FROM sf_eval_battles
-	        ORDER BY $tsCol DESC
-	        LIMIT :lim";
+if ($hasAll) {
+	$sql = "
+		SELECT guild_id, battle_type, battle_date, battle_time
+		FROM sf_eval_battles
+		ORDER BY battle_date DESC, battle_time DESC, id DESC
+		LIMIT :lim
+	";
 	$stmt = $pdo->prepare($sql);
 	$stmt->bindValue(':lim', $scanLimit, PDO::PARAM_INT);
 	$stmt->execute();
@@ -116,58 +84,23 @@ if ($attCol && $defCol) {
 	$totalGuilds = count($guilds);
 
 	while ($row = $stmt->fetch()) {
-		$when = $fmtWhen($row['ts'] ?? null);
-		$a = (int)($row['a'] ?? 0);
-		$d = (int)($row['d'] ?? 0);
-
-		if (isset($rowsByGuild[$a]) && $counts[$a] < $perGuildLimit) {
-			$rowsByGuild[$a][] = ['when' => $when, 'kind' => 'Angriff'];
-			$counts[$a]++;
-			if ($counts[$a] === $perGuildLimit) $done++;
-		}
-		if (isset($rowsByGuild[$d]) && $counts[$d] < $perGuildLimit) {
-			$rowsByGuild[$d][] = ['when' => $when, 'kind' => 'Verteidigung'];
-			$counts[$d]++;
-			if ($counts[$d] === $perGuildLimit) $done++;
-		}
-
-		if ($done >= $totalGuilds) break;
-	}
-} elseif ($guildCol) {
-	$selectType = $typeCol ? ", $typeCol AS t" : "";
-	$sql = "SELECT $tsCol AS ts, $guildCol AS g $selectType
-	        FROM sf_eval_battles
-	        ORDER BY $tsCol DESC
-	        LIMIT :lim";
-	$stmt = $pdo->prepare($sql);
-	$stmt->bindValue(':lim', $scanLimit, PDO::PARAM_INT);
-	$stmt->execute();
-
-	$done = 0;
-	$totalGuilds = count($guilds);
-
-	while ($row = $stmt->fetch()) {
-		$gid = (int)($row['g'] ?? 0);
+		$gid = (int)$row['guild_id'];
 		if (!isset($rowsByGuild[$gid]) || $counts[$gid] >= $perGuildLimit) continue;
 
-		$when = $fmtWhen($row['ts'] ?? null);
-		$kind = $typeCol ? $kindFromType($typeCol, $row['t'] ?? null) : 'Kampf';
+		$when = $fmtWhen((string)$row['battle_date'], (string)$row['battle_time']);
+		$kind = $mapType((string)$row['battle_type']);
 
 		$rowsByGuild[$gid][] = ['when' => $when, 'kind' => $kind];
 		$counts[$gid]++;
-		if ($counts[$gid] === $perGuildLimit) $done++;
 
+		if ($counts[$gid] === $perGuildLimit) $done++;
 		if ($done >= $totalGuilds) break;
 	}
 } else {
-	// wenn weder attacker/defender noch guild_id existiert -> Seite läuft, aber leer
+	// Schema passt nicht -> Seite zeigt wenigstens leer statt kaputt
+	// (hier könnten wir später noch einen Fallback einbauen)
 }
 
-// --- Rendern über vorhandenes Layout
-$viewFile = __DIR__ . '/../../../app/views/sf_eval_fights.php';
-
-ob_start();
-require $viewFile;
-$content = ob_get_clean();
-
+// --- Rendern über Layout (Layout erwartet i.d.R. $view)
+$view = __DIR__ . '/../../../app/views/sf_eval_fights.php';
 require __DIR__ . '/../../../app/views/layout.php';
