@@ -591,6 +591,18 @@ foreach ($players as $p) {
     else $playersActive[] = $p;
 }
 
+// Inaktive nach Tagen absteigend sortieren (höchste zuerst)
+usort($playersInactive, function (array $a, array $b): int {
+    $da = is_int($a['inactive_days'] ?? null) ? (int)$a['inactive_days'] : 0;
+    $db = is_int($b['inactive_days'] ?? null) ? (int)$b['inactive_days'] : 0;
+
+    if ($da !== $db) return $db <=> $da;
+
+    $na = (string)($a['display_name'] ?? $a['name'] ?? '');
+    $nb = (string)($b['display_name'] ?? $b['name'] ?? '');
+    return strcasecmp($na, $nb);
+});
+
 // Export: weiterhin inkl. Inaktive (damit keine Daten fehlen)
 $playersForExport = array_merge($playersActive, $playersInactive);
 
