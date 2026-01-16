@@ -19,6 +19,82 @@ function sf_stripos_u(string $haystack, string $needle)
     return stripos($haystack, $needle);
 }
 
+function sf_rank_group($rank): int
+{
+    if ($rank === null || $rank === '') {
+        return 2; // default: Mitglied
+    }
+
+    // Numeric ranks (best effort)
+    if (is_int($rank) || (is_string($rank) && ctype_digit($rank))) {
+        $n = (int)$rank;
+
+        // häufige Konventionen: 1=Leader, 2=Officer, 3=Member
+        if ($n === 0 || $n === 1) return 0; // Leader / Anführer
+        if ($n === 2) return 1;            // Officer
+        return 2;                          // Member
+    }
+
+    $s = (string)$rank;
+    if (function_exists('mb_strtolower')) {
+        $s = mb_strtolower($s, 'UTF-8');
+    } else {
+        $s = strtolower($s);
+    }
+
+    // Leader / Anführer
+    if (strpos($s, 'anführ') !== false || strpos($s, 'leiter') !== false || strpos($s, 'leader') !== false || strpos($s, 'master') !== false) {
+        return 0;
+    }
+
+    // Officer / Offizier
+    if (strpos($s, 'offiz') !== false || strpos($s, 'officer') !== false) {
+        return 1;
+    }
+
+    return 2;
+}
+
+/**
+ * Holt Rank+Level direkt aus der members-Tabelle.
+ * Rückgabe: [playerName => ['level' => int, 'rank' => mixed]]
+ */
+function sf_fetch_roster_meta(PDO $pdo, int $guildId): array
+{
+    $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    if ($driver !== 'sqlite') {
+        return [];
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT name, level, rank
+            FROM members
+            WHERE guild_id = ?
+            ORDER BY updated_at DESC
+        ");
+        $stmt->execute([$guildId]);
+    } catch (Throwable $e) {
+        return [];
+    }
+
+    $meta = [];
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $pn = trim((string)($r['name'] ?? ''));
+        if ($pn === '') continue;
+
+        // erster Treffer gewinnt (durch ORDER BY updated_at DESC ist das der aktuellste)
+        if (!isset($meta[$pn])) {
+            $meta[$pn] = [
+                'level' => (int)($r['level'] ?? 0),
+                'rank'  => $r['rank'] ?? null,
+            ];
+        }
+    }
+
+    return $meta;
+}
+
 function sf_merge_stats_rows(array $rows, string $prefix, array &$map): void
 {
     foreach ($rows as $r) {
@@ -30,6 +106,9 @@ function sf_merge_stats_rows(array $rows, string $prefix, array &$map): void
         if (!isset($map[$name])) {
             $map[$name] = [
                 'name'        => $name,
+                'level'       => 0,
+                'rank_raw'    => null,
+
                 'a_done'      => 0,
                 'a_total'     => 0,
                 'a_miss'      => 0,
@@ -51,6 +130,17 @@ function sf_merge_stats_rows(array $rows, string $prefix, array &$map): void
         $map[$name][$prefix . '_done']  = max(0, $done);
         $map[$name][$prefix . '_miss']  = max(0, $miss);
         $map[$name][$prefix . '_total'] = max(0, $total);
+
+        // optional: level/rank aus Stats-Row übernehmen, falls vorhanden
+        $lvl = (int)($r['level'] ?? ($r['player_level'] ?? 0));
+        if ($lvl > (int)$map[$name]['level']) {
+            $map[$name]['level'] = $lvl;
+        }
+
+        $rk = $r['rank'] ?? ($r['player_rank'] ?? ($r['guild_rank'] ?? ($r['role'] ?? null)));
+        if ($rk !== null && $rk !== '') {
+            $map[$name]['rank_raw'] = $rk;
+        }
     }
 }
 
@@ -122,6 +212,23 @@ $playersMap = [];
 sf_merge_stats_rows((array)($attack['rows'] ?? []), 'a', $playersMap);
 sf_merge_stats_rows((array)($defense['rows'] ?? []), 'v', $playersMap);
 
+$rosterMeta = ($guildId > 0) ? sf_fetch_roster_meta(db(), $guildId) : [];
+
+// Safety: rosterMeta nur nutzen, wenn es auch wirklich Spieler aus $playersMap trifft
+if ($rosterMeta) {
+    $playerKeys = array_fill_keys(array_keys($playersMap), true);
+    $hits = 0;
+    foreach ($rosterMeta as $pn => $_) {
+        if (isset($playerKeys[$pn])) {
+            $hits++;
+            if ($hits >= 2) break; // reicht, um "passt" anzunehmen
+        }
+    }
+    if ($hits < 2) {
+        $rosterMeta = [];
+    }
+}
+
 $attacksTotal  = (int)$stats['attacks'];
 $defensesTotal = (int)$stats['defenses'];
 
@@ -178,6 +285,20 @@ foreach ($playersMap as $name => $p) {
         $pct = (int)round(($doneTotal / $total) * 100);
     }
 
+    $level   = (int)($p['level'] ?? 0);
+    $rankRaw = $p['rank_raw'] ?? null;
+
+    if (isset($rosterMeta[$name])) {
+        if (!empty($rosterMeta[$name]['level'])) {
+            $level = max($level, (int)$rosterMeta[$name]['level']);
+        }
+        if (($rosterMeta[$name]['rank'] ?? null) !== null && ($rosterMeta[$name]['rank'] ?? '') !== '') {
+            $rankRaw = $rosterMeta[$name]['rank'];
+        }
+    }
+
+    $rankGroup = sf_rank_group($rankRaw);
+
     $cls = 'good';
     if ($pct < 60) {
         $cls = 'bad';
@@ -187,6 +308,8 @@ foreach ($playersMap as $name => $p) {
 
     $row = [
         'name'       => (string)$name,
+        'level'      => $level,
+        'rank_group' => $rankGroup,
         'a_done'     => $aDone,
         'a_total'    => $aTotal,
         'a_miss'     => $aMiss,
@@ -254,14 +377,27 @@ if ($q !== '') {
     }));
 }
 
-// Sort: zuerst fehlende, dann Quote, dann Name
+// Sort: zuerst nach Gildenrang, dann nach Level
 usort($players, function (array $a, array $b): int {
+    // 1) Ranggruppe: Leader (0) -> Officer (1) -> Member (2)
+    $rgA = (int)($a['rank_group'] ?? 2);
+    $rgB = (int)($b['rank_group'] ?? 2);
+    if ($rgA !== $rgB) {
+        return $rgA <=> $rgB;
+    }
+
+    // 2) Level absteigend
+    $lvA = (int)($a['level'] ?? 0);
+    $lvB = (int)($b['level'] ?? 0);
+    if ($lvA !== $lvB) {
+        return $lvB <=> $lvA;
+    }
+
+    // 3) Optional weiterhin: fehlende Kämpfe (damit Problemfälle höher stehen)
     if ($a['missing'] !== $b['missing']) {
         return $b['missing'] <=> $a['missing'];
     }
-    if ($a['pct'] !== $b['pct']) {
-        return $a['pct'] <=> $b['pct'];
-    }
+
     return strcasecmp($a['name'], $b['name']);
 });
 
@@ -454,7 +590,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
             <div>
               <h3>Spieler (kompakt)</h3>
               <div class="sf-table-note">
-                Sortierung: zuerst fehlende Kämpfe · Klick auf Zeile = Details · Anzeige: <strong><?= (int)count($players) ?></strong> Spieler
+                Sortierung: Rang (Anführer/Offiziere/Mitglieder), dann Level · Klick auf Zeile = Details · Anzeige: <strong><?= (int)count($players) ?></strong> Spieler
               </div>
             </div>
           </div>
@@ -510,6 +646,9 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
                   >
                     <td>
                       <?= e($name) ?>
+                      <?php if (!empty($p['level'])): ?>
+                        <span class="sf-mini">(<?= (int)$p['level'] ?>)</span>
+                      <?php endif; ?>
                       <?php if ($miss > 0): ?>
                         <span style="margin-left:10px" class="sf-miss-badge">-<?= $miss ?></span>
                       <?php endif; ?>
