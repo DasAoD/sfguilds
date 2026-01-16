@@ -102,5 +102,10 @@ if ($hasAll) {
 }
 
 // --- Rendern über Layout (Layout erwartet i.d.R. $view)
-$view = __DIR__ . '/../../../app/views/sf_eval_fights.php';
+$viewFile = __DIR__ . '/../../../app/views/sf_eval_fights.php';
+
+ob_start();
+require $viewFile;
+$content = ob_get_clean();
+
 require __DIR__ . '/../../../app/views/layout.php';
