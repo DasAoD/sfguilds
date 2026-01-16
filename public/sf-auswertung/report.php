@@ -625,7 +625,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
 
         <label class="sf-pill" title="Nur Spieler mit fehlenden Kämpfen anzeigen">
           <input type="checkbox" name="missing" value="1" <?= $onlyMissing ? 'checked' : '' ?> onchange="this.form.submit()">
-          Nur Fehlende
+          Nicht teilgenommen
         </label>
 
         <input class="sf-input" type="search" name="q" value="<?= e($q) ?>" placeholder="Suche…" autocomplete="off">
