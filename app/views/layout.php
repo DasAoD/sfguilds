@@ -41,6 +41,7 @@ $title = $title ?? "S&F Guilds";
 					<?= a_active('/', 'Home', 'btn') ?>
 					<?php if (isAdmin()): ?>
 						<?= a_active('/sf-auswertung/', 'SF Auswertung', 'btn', true) ?>
+						<?= a_active('/sf-auswertung/kaempfe/', 'Kämpfe', 'btn') ?>
 						<?= a_active('/admin/', 'Admin', 'btn', true) ?>
 						<a class="btn" href="<?= e(url('/admin/logout.php')) ?>">Logout</a>
 					<?php else: ?>
