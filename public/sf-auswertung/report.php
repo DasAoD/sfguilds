@@ -109,71 +109,70 @@ function sf_fetch_roster_meta(PDO $pdo, int $guildId): array
     }
     $colSet = array_flip($cols);
 
-    // Kandidaten
-    $nameCandidates  = ['name', 'player_name', 'player'];
-    $levelCandidates = ['level', 'player_level', 'lvl'];
-    $rankCandidates  = ['rank', 'guild_rank', 'role', 'guild_role', 'player_rank'];
-
-    $inactiveDaysCandidates = ['inactive_days', 'days_inactive', 'inactivity_days', 'afk_days'];
-    $lastActiveCandidates   = ['last_active', 'last_seen', 'last_online', 'last_login', 'last_activity'];
-
-    $activeFlagCandidates   = ['in_guild', 'is_member', 'is_active', 'active'];
-    $statusCandidates       = ['status', 'member_status'];
-    $leftAtCandidates       = ['left_at', 'kicked_at', 'removed_at', 'ended_at'];
-
-    $updatedCandidates      = ['updated_at', 'imported_at', 'snapshot_date', 'roster_date', 'created_at'];
-
-    // Pflicht: guild_id
     if (!isset($colSet['guild_id'])) {
         return ['exact' => [], 'base' => []];
     }
 
+    // Kandidaten (best effort)
     $nameCol = null;
-    foreach ($nameCandidates as $c) if (isset($colSet[$c])) { $nameCol = $c; break; }
-
-    $levelCol = null;
-    foreach ($levelCandidates as $c) if (isset($colSet[$c])) { $levelCol = $c; break; }
-
-    $rankCol = null;
-    foreach ($rankCandidates as $c) if (isset($colSet[$c])) { $rankCol = $c; break; }
-
+    foreach (['name', 'player_name', 'player'] as $c) {
+        if (isset($colSet[$c])) { $nameCol = $c; break; }
+    }
     if (!$nameCol) {
         return ['exact' => [], 'base' => []];
     }
 
+    $levelCol = null;
+    foreach (['level', 'player_level', 'lvl'] as $c) {
+        if (isset($colSet[$c])) { $levelCol = $c; break; }
+    }
+
+    $rankCol = null;
+    foreach (['rank', 'guild_rank', 'role', 'guild_role', 'player_rank'] as $c) {
+        if (isset($colSet[$c])) { $rankCol = $c; break; }
+    }
+
     $inactiveCol = null;
-    foreach ($inactiveDaysCandidates as $c) if (isset($colSet[$c])) { $inactiveCol = $c; break; }
+    foreach (['inactive_days', 'days_inactive', 'inactivity_days', 'afk_days'] as $c) {
+        if (isset($colSet[$c])) { $inactiveCol = $c; break; }
+    }
 
     $lastActiveCol = null;
-    foreach ($lastActiveCandidates as $c) if (isset($colSet[$c])) { $lastActiveCol = $c; break; }
+    foreach (['last_active', 'last_seen', 'last_online', 'last_login', 'last_activity'] as $c) {
+        if (isset($colSet[$c])) { $lastActiveCol = $c; break; }
+    }
 
     $activeFlagCol = null;
-    foreach ($activeFlagCandidates as $c) if (isset($colSet[$c])) { $activeFlagCol = $c; break; }
+    foreach (['in_guild', 'is_member', 'is_active', 'active'] as $c) {
+        if (isset($colSet[$c])) { $activeFlagCol = $c; break; }
+    }
 
     $statusCol = null;
-    foreach ($statusCandidates as $c) if (isset($colSet[$c])) { $statusCol = $c; break; }
+    foreach (['status', 'member_status'] as $c) {
+        if (isset($colSet[$c])) { $statusCol = $c; break; }
+    }
 
     $leftAtCol = null;
-    foreach ($leftAtCandidates as $c) if (isset($colSet[$c])) { $leftAtCol = $c; break; }
+    foreach (['left_at', 'kicked_at', 'removed_at', 'ended_at'] as $c) {
+        if (isset($colSet[$c])) { $leftAtCol = $c; break; }
+    }
 
     $tsCol = null;
-    foreach ($updatedCandidates as $c) if (isset($colSet[$c])) { $tsCol = $c; break; }
+    foreach (['updated_at', 'imported_at', 'snapshot_date', 'roster_date', 'created_at'] as $c) {
+        if (isset($colSet[$c])) { $tsCol = $c; break; }
+    }
 
+    // SQL
     $select = [
         "$nameCol AS name",
         ($levelCol ? "$levelCol AS level" : "NULL AS level"),
         ($rankCol ? "$rankCol AS rank" : "NULL AS rank"),
-        ($inactiveCol ? "$inactiveCol ASA inactive_days" : "NULL AS inactive_days"),
+        ($inactiveCol ? "$inactiveCol AS inactive_days" : "NULL AS inactive_days"),
         ($lastActiveCol ? "$lastActiveCol AS last_active" : "NULL AS last_active"),
         ($activeFlagCol ? "$activeFlagCol AS active_flag" : "NULL AS active_flag"),
         ($statusCol ? "$statusCol AS status" : "NULL AS status"),
         ($leftAtCol ? "$leftAtCol AS left_at" : "NULL AS left_at"),
     ];
-
-    // SQLite: "AS" Tippfehler vermeiden, wenn oben mal falsch getippt wurde (Safety)
-    $select = array_map(static function ($s) {
-        return str_replace(' AS', ' AS', str_replace('A inactive_days', 'AS inactive_days', $s));
-    }, $select);
 
     $sql = "SELECT " . implode(", ", $select) . " FROM members WHERE guild_id = ?";
     if ($tsCol) {
@@ -226,10 +225,13 @@ function sf_fetch_roster_meta(PDO $pdo, int $guildId): array
             if ($inactiveDays < 0) $inactiveDays = 0;
         } elseif (($r['last_active'] ?? null) !== null && (string)$r['last_active'] !== '') {
             try {
-                $dt  = new DateTime((string)$r['last_active']);
-                $now = new DateTime('now');
-                $inactiveDays = (int)$now->diff($dt)->days;
-                if ($inactiveDays < 0) $inactiveDays = 0;
+                $last = new DateTime((string)$r['last_active']);
+                $now  = new DateTime('now');
+                $diff = $last->diff($now); // last -> now
+                $inactiveDays = (int)$diff->days;
+                if ($diff->invert === 1) {
+                    $inactiveDays = 0;
+                }
             } catch (Throwable $e) {
                 $inactiveDays = null;
             }
@@ -512,7 +514,7 @@ if ($rosterUsable) {
     }));
 }
 
-// KPIs nach Filter neu berechnen
+// KPIs
 $sumDoneTotal = 0;
 $missingPlayersCount = 0;
 
@@ -549,7 +551,7 @@ usort($topMissing, function (array $a, array $b): int {
 });
 $topMissing = array_slice($topMissing, 0, 5);
 
-// Filter (nur Tabelle/Export)
+// Filter (für Tabelle + Inaktiv-Box + Export)
 $players = $playersAll;
 
 if ($onlyMissing) {
@@ -580,7 +582,7 @@ usort($players, function (array $a, array $b): int {
     return strcasecmp($na, $nb);
 });
 
-// Inaktive (>= 7 Tage) nach unten
+// Split: Aktiv (Tabelle) / Inaktiv (rechte Box)
 $playersActive = [];
 $playersInactive = [];
 
@@ -589,6 +591,7 @@ foreach ($players as $p) {
     else $playersActive[] = $p;
 }
 
+// Export: weiterhin inkl. Inaktive (damit keine Daten fehlen)
 $playersForExport = array_merge($playersActive, $playersInactive);
 
 // CSV Export
@@ -673,6 +676,9 @@ if ($q !== '') $formParams['q'] = $q;
 $exportParams = $formParams;
 $exportParams['export'] = 'csv';
 $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams));
+
+$activeCount   = count($playersActive);
+$inactiveCount = count($playersInactive);
 ?>
 
 <div class="sf-report">
@@ -757,7 +763,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
         <div class="sf-card">
           <div class="sf-kpi-label">Verteidigungen</div>
           <div class="sf-kpi-value"><?= (int)$defensesTotal ?></div>
-          <div class="sf-kpi-h_unpacking?sfguilds`?`int">Kämpfe je Spieler</div>
+          <div class="sf-kpi-hint">Kämpfe je Spieler</div>
         </div>
 
         <div class="sf-card">
@@ -767,9 +773,9 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
         </div>
 
         <div class="sf-card">
-          <div class="sf-kpi-label">Nicht teilgenommen</div>
+          <div class="sf-kpi-label">Fehlende</div>
           <div class="sf-kpi-value"><?= (int)$missingPlayersCount ?></div>
-          <div class="sf-kpi-hint bad">Spieler mit Lücke</div>
+          <div class="sf-kpi-hint bad">Nicht teilgenommen</div>
         </div>
       </div>
 
@@ -780,7 +786,11 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
             <div>
               <h3>Spieler (kompakt)</h3>
               <div class="sf-table-note">
-                Sortierung: Rang, dann Level · Inaktive (≥ 7 Tage) ganz unten · Klick auf Zeile = Details · Anzeige: <strong><?= (int)count($playersForExport) ?></strong> Spieler
+                Sortierung: Rang, dann Level · Klick auf Zeile = Details ·
+                Anzeige: <strong><?= (int)$activeCount ?></strong> Spieler
+                <?php if ($inactiveCount > 0): ?>
+                  <span class="sf-mini" style="margin-left:8px; opacity:.75;">(+<?= (int)$inactiveCount ?> inaktiv rechts)</span>
+                <?php endif; ?>
               </div>
             </div>
           </div>
@@ -796,7 +806,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
               </tr>
             </thead>
             <tbody>
-              <?php if (!$playersForExport): ?>
+              <?php if (!$playersActive): ?>
                 <tr>
                   <td colspan="5" style="opacity:.8;">Keine Treffer (Filter zu streng?).</td>
                 </tr>
@@ -851,68 +861,6 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
                     </td>
                   </tr>
                 <?php endforeach; ?>
-
-                <?php if ($playersInactive): ?>
-                  <tr class="sf-sep">
-                    <td colspan="5" style="padding:10px 12px; opacity:.85; font-weight:800;">
-                      Inaktiv (ab 7 Tagen)
-                    </td>
-                  </tr>
-
-                  <?php foreach ($playersInactive as $p): ?>
-                    <?php
-                      $displayName = (string)($p['display_name'] ?? $p['name'] ?? '');
-                      $aDone  = (int)$p['a_done'];
-                      $aTotal = (int)$p['a_total'];
-                      $vDone  = (int)$p['v_done'];
-                      $vTotal = (int)$p['v_total'];
-                      $done   = (int)$p['done_total'];
-                      $total  = (int)$p['total'];
-                      $miss   = (int)$p['missing'];
-                      $pct    = (int)$p['pct'];
-                      $cls    = (string)$p['cls'];
-
-                      $aCls = ($aTotal > 0 && $aDone >= $aTotal) ? 'good' : (($aDone <= 0) ? 'bad' : 'warn');
-                      $vCls = ($vTotal > 0 && $vDone >= $vTotal) ? 'good' : (($vDone <= 0) ? 'bad' : 'warn');
-
-                      $idays = $p['inactive_days'] ?? null;
-                      $inactiveLabel = (is_int($idays) ? ('Inaktiv: ' . $idays . 'd') : 'Inaktiv');
-                    ?>
-
-                    <tr
-                      class="sf-row"
-                      data-player="<?= e($displayName) ?>"
-                      data-a-done="<?= $aDone ?>"
-                      data-a-total="<?= $aTotal ?>"
-                      data-v-done="<?= $vDone ?>"
-                      data-v-total="<?= $vTotal ?>"
-                      data-done="<?= $done ?>"
-                      data-total="<?= $total ?>"
-                      data-miss="<?= $miss ?>"
-                      data-pct="<?= $pct ?>"
-                    >
-                      <td>
-                        <?= e($displayName) ?>
-                        <?php if (!empty($p['level'])): ?>
-                          <span class="sf-mini">(<?= (int)$p['level'] ?>)</span>
-                        <?php endif; ?>
-                        <span class="sf-mini" style="margin-left:10px; opacity:.75;"><?= e($inactiveLabel) ?></span>
-                        <?php if ($miss > 0): ?>
-                          <span style="margin-left:10px" class="sf-miss-badge">-<?= $miss ?></span>
-                        <?php endif; ?>
-                      </td>
-
-                      <td class="sf-num <?= e($aCls) ?>"><?= $aDone ?>/<?= $aTotal ?></td>
-                      <td class="sf-num <?= e($vCls) ?>"><?= $vDone ?>/<?= $vTotal ?></td>
-                      <td class="sf-num <?= e($cls) ?>"><?= $done ?>/<?= $total ?></td>
-
-                      <td>
-                        <div class="sf-progress <?= e($cls) ?>"><span style="width: <?= $pct ?>%"></span></div>
-                        <div class="sf-mini" style="margin-top:6px; text-align:right;"><?= $pct ?>%</div>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                <?php endif; ?>
 
               <?php endif; ?>
             </tbody>
@@ -970,6 +918,40 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
               </div>
             </div>
           </div>
+
+          <?php if (!empty($playersInactive)): ?>
+            <div class="sf-card">
+              <div style="display:flex; align-items:baseline; justify-content:space-between;">
+                <div style="font-weight:700;">Inaktiv (ab 7 Tagen)</div>
+                <div class="sf-mini"><?= (int)count($playersInactive) ?></div>
+              </div>
+
+              <div class="sf-list" style="margin-top:10px;">
+                <?php foreach (array_slice($playersInactive, 0, 12) as $p): ?>
+                  <?php
+                    $dn = (string)($p['display_name'] ?? $p['name'] ?? '');
+                    $lv = (int)($p['level'] ?? 0);
+                    $idays = (int)($p['inactive_days'] ?? 0);
+                  ?>
+                  <div class="sf-item">
+                    <div>
+                      <?= e($dn) ?>
+                      <?php if ($lv > 0): ?>
+                        <span class="sf-mini">(<?= $lv ?>)</span>
+                      <?php endif; ?>
+                    </div>
+                    <div class="sf-right">Inaktiv: <?= $idays ?> Tage</div>
+                  </div>
+                <?php endforeach; ?>
+
+                <?php if (count($playersInactive) > 12): ?>
+                  <div class="sf-mini" style="opacity:.75; margin-top:8px;">
+                    +<?= (int)(count($playersInactive) - 12) ?> weitere …
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+          <?php endif; ?>
 
         </div>
 
