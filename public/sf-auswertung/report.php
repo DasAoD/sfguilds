@@ -670,7 +670,7 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
         <div class="sf-card">
           <div class="sf-kpi-label">Fehlende</div>
           <div class="sf-kpi-value"><?= (int)$missingPlayersCount ?></div>
-          <div class="sf-kpi-hint bad">Spieler mit Lücke</div>
+          <div class="sf-kpi-hint bad">Nicht teilgenommen</div>
         </div>
       </div>
 
@@ -763,7 +763,6 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
 
           <div class="sf-card">
             <h3>Auffälligkeiten</h3>
-            <div class="sf-mini">Schnell-Übersicht ohne Scroll-Orgie</div>
           </div>
 
           <div class="sf-card">
@@ -801,27 +800,19 @@ $exportHref = url('/sf-auswertung/report.php?' . http_build_query($exportParams)
           </div>
 
           <div class="sf-card">
-            <div style="font-weight:700;">Aktion</div>
-            <div class="sf-list">
-              <div class="sf-item">
-                <div>Direkt pingbar</div>
-                <div class="sf-right" style="color:var(--sf-good)">Ja</div>
+              <div style="font-weight:700;">Aktion</div>
+              <div class="sf-list">
+                  <div class="sf-item">
+                      <div>Export CSV</div>
+                      <div class="sf-right" style="color:#7aa7ff;">
+                          <a class="btn" href="<?= e($exportHref) ?>" style="padding:6px 10px; border-radius:999px;">Download</a>
+                      </div>
+                  </div>
               </div>
-              <div class="sf-item">
-                <div>Export CSV</div>
-                <div class="sf-right" style="color:#7aa7ff;">
-                  <a class="btn" href="<?= e($exportHref) ?>" style="padding:6px 10px; border-radius:999px;">Download</a>
-                </div>
-              </div>
-              <div class="sf-item">
-                <div>Screenshot-freundlich</div>
-                <div class="sf-right" style="color:var(--sf-good)">Ja</div>
-              </div>
-            </div>
           </div>
-
+            
         </div>
-
+          
       </div>
 
       <!-- Details Modal -->
