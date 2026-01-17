@@ -7,6 +7,7 @@
 	
 	<form method="post" class="login-form">
 		<input type="hidden" name="next" value="<?= e($next ?? "/") ?>">
+		<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 		<div class="row">
 			<label>Benutzername
 				<input type="text" name="username" required>
