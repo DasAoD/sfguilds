@@ -19,6 +19,7 @@ $error = null;
 $prefGuildId = (int)($_GET['guild_id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_check();
     $guildId = (int)($_POST['guild_id'] ?? 0);
     $prefGuildId = $guildId;
     $date = trim((string)($_POST['date'] ?? ''));
