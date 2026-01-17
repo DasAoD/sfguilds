@@ -3,6 +3,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
+if (!function_exists('isAdmin') || !isAdmin()) {
+	$next = $_SERVER['REQUEST_URI'] ?? '/sf-auswertung/kaempfe/';
+	header('Location: ' . url('/admin/login.php?next=' . rawurlencode($next)));
+	exit;
+}
+
 $title = 'Kämpfe';
 
 // Admin-Flag (Seite darf sichtbar bleiben, aber POST-Aktionen sind admin-only)
