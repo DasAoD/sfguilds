@@ -28,17 +28,22 @@
 
 <h2>Kämpfe – Monatsübersicht</h2>
 
-<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: 10px 0 16px;">
-	<a class="btn" href="?m=<?= htmlspecialchars($prevMonth, ENT_QUOTES, 'UTF-8') ?><?= !empty($filterGuildId) ? '&g='.(int)$filterGuildId : '' ?>">‹</a>
-	<strong style="font-size:1.1em;"><?= htmlspecialchars($monthTitle, ENT_QUOTES, 'UTF-8') ?></strong>
-	<a class="btn" href="?m=<?= htmlspecialchars($nextMonth, ENT_QUOTES, 'UTF-8') ?><?= !empty($filterGuildId) ? '&g='.(int)$filterGuildId : '' ?>">›</a>
-	<?php if (!empty($filterGuildId)): ?>
-	<a class="btn" href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>">Alle Gilden</a>
-	<?php endif; ?>
+<div style="margin: 10px 0 16px; text-align:center;">
+	<div style="display:inline-flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;">
+		<a class="btn" href="?m=<?= htmlspecialchars($prevMonth, ENT_QUOTES, 'UTF-8') ?><?= !empty($filterGuildId) ? '&g='.(int)$filterGuildId : '' ?>">‹</a>
 
-	<span class="muted" style="margin-left:10px;">
+		<strong style="font-size:1.1em;"><?= htmlspecialchars($monthTitle, ENT_QUOTES, 'UTF-8') ?></strong>
+
+		<a class="btn" href="?m=<?= htmlspecialchars($nextMonth, ENT_QUOTES, 'UTF-8') ?><?= !empty($filterGuildId) ? '&g='.(int)$filterGuildId : '' ?>">›</a>
+
+		<?php if (!empty($filterGuildId)): ?>
+			<a class="btn" href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>">Alle Gilden</a>
+		<?php endif; ?>
+	</div>
+
+	<div class="muted" style="margin-top:6px;">
 		Tipp: Klick auf einen Tag mit Kämpfen → Details erscheinen darunter.
-	</span>
+	</div>
 </div>
 
 <?php
