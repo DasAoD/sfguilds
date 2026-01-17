@@ -821,23 +821,31 @@ $inactiveCount = count($playersInactive);
             Bitte wähle eine Gilde für den SF-Report aus:
           <?php endif; ?>
         </div>
+        <?php if ($guildId > 0): ?>
+        <div style="margin-top:10px; display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; max-width: min(820px, 70vw);">
+        <?php foreach ($guilds as $g): ?>
+        <?php
+        $gid = (int)($g['id'] ?? 0);
+        if ($gid <= 0) continue;
+
+        $href = url('/sf-auswertung/report.php?guild_id=' . $gid);
+        $cls  = 'btn' . ($gid === (int)$guildId ? ' active' : '');
+        $label = (string)($g['name'] ?? '');
+      ?>
+      <a class="<?= e($cls) ?>" href="<?= e($href) ?>" style="white-space:nowrap; padding:6px 12px; border-radius:999px;">
+        <?= e($label) ?>
+      </a>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
       </div>
     </div>
 
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
       <?php if ($guildId > 0): ?>
-        <a class="btn" href="<?= e($importHref) ?>">Import</a>
-        <a class="btn active" href="<?= e($reportHref) ?>">Report</a>
-
         <form class="sf-filters" method="get">
-          <select name="guild_id" class="sf-input" onchange="this.form.submit()">
-            <option value="0">– Gilde wählen –</option>
-            <?php foreach ($guilds as $g): ?>
-              <option value="<?= (int)$g['id'] ?>" <?= $guildId === (int)$g['id'] ? 'selected' : '' ?>>
-                <?= e($g['name']) ?> (<?= e($g['server']) ?>)
-              </option>
-            <?php endforeach; ?>
-          </select>
+          <input type="hidden" name="guild_id" value="<?= (int)$guildId ?>">
 
           <label class="sf-pill" title="Nur Spieler mit fehlenden Kämpfen anzeigen">
             <input type="checkbox" name="missing" value="1" <?= $onlyMissing ? 'checked' : '' ?> onchange="this.form.submit()">
@@ -1078,17 +1086,26 @@ $inactiveCount = count($playersInactive);
             </div>
           </div>
 
-          <div class="sf-card">
-            <div style="font-weight:700;">Aktion</div>
-            <div class="sf-list">
-              <div class="sf-item">
-                <div>Export CSV</div>
-                <div class="sf-right" style="color:#7aa7ff;">
-                  <a class="btn" href="<?= e($exportHref) ?>" style="padding:6px 10px; border-radius:999px;">Download</a>
-                </div>
+        <div class="sf-card">
+          <div style="font-weight:700;">Aktion</div>
+          <div class="sf-list">
+
+            <div class="sf-item">
+              <div>Import</div>
+              <div class="sf-right" style="color:#7aa7ff;">
+                <a class="btn" href="<?= e($importHref) ?>" style="padding:6px 10px; border-radius:999px;">Öffnen</a>
               </div>
             </div>
+
+            <div class="sf-item">
+              <div>Export CSV</div>
+              <div class="sf-right" style="color:#7aa7ff;">
+                <a class="btn" href="<?= e($exportHref) ?>" style="padding:6px 10px; border-radius:999px;">Download</a>
+              </div>
+            </div>
+
           </div>
+        </div>
 
           <?php if (!empty($playersInactive)): ?>
             <div class="sf-card">
