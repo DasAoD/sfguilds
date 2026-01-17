@@ -677,6 +677,7 @@
 			
 			<form method="post"
 			action="/admin/crest.php"
+				<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 			enctype="multipart/form-data"
 			style="display:flex; align-items:center; gap:8px; margin:0; flex-wrap:wrap;">
 				<input type="hidden" name="action" value="upload">
@@ -689,6 +690,7 @@
 			</form>
 		</div>
 		<div class="row" style="align-items:center; gap:12px; flex-wrap:wrap;">
+			<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 			<?php if (!empty($guild["crest_file"])): ?>
 			<form method="post" action="/admin/crest.php" style="margin:0;">
 				<input type="hidden" name="action" value="delete">
@@ -714,6 +716,7 @@
 		<p class="muted" style="margin-top:0;">
 			Import macht Insert/Update anhand von <strong>Name</strong>. Es wird <strong>nichts gelöscht</strong>.
 			Entlassen/Verlassen/Notizen werden nur überschrieben, wenn die CSV dort Werte enthält.
+			<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 		</p>
 		<form method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>" enctype="multipart/form-data">
 			<input type="hidden" name="action" value="import_csv">
@@ -743,6 +746,7 @@
 			) ?></a></li>
 			<?php endforeach; ?>
 		</ul>
+		<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 		
 		<form method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>" style="margin-top: .75rem;">
 			<input type="hidden" name="action" value="clear_missing">
@@ -801,6 +805,7 @@
 					<td><textarea form="<?= $formId ?>" name="notes" rows="2" style="width:100%;"><?= h(
 						$m["notes"] ?? "",
 					) ?></textarea></td>
+					<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 					<td style="white-space:nowrap;">
 						<form id="<?= $formId ?>" method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>#m<?= $mid ?>">
 							<input type="hidden" name="action" value="save_member">
