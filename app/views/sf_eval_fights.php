@@ -29,9 +29,9 @@
 <h2>Kämpfe – Monatsübersicht</h2>
 
 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: 10px 0 16px;">
-	<a class="btn" href="?m=<?= htmlspecialchars($prevMonth, ENT_QUOTES, 'UTF-8') ?>">‹</a>
+	<a class="btn" href="?m=<?= htmlspecialchars($prevMonth, ENT_QUOTES, 'UTF-8') ?><?= !empty($filterGuildId) ? '&g='.(int)$filterGuildId : '' ?>">‹</a>
 	<strong style="font-size:1.1em;"><?= htmlspecialchars($monthTitle, ENT_QUOTES, 'UTF-8') ?></strong>
-	<a class="btn" href="?m=<?= htmlspecialchars($nextMonth, ENT_QUOTES, 'UTF-8') ?>">›</a>
+	<a class="btn" href="?m=<?= htmlspecialchars($nextMonth, ENT_QUOTES, 'UTF-8') ?><?= !empty($filterGuildId) ? '&g='.(int)$filterGuildId : '' ?>">›</a>
 	<?php if (!empty($filterGuildId)): ?>
 	<a class="btn" href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>">Alle Gilden</a>
 	<?php endif; ?>
@@ -68,7 +68,7 @@ $fmtDateDe = static function(string $ymd): string {
 		$day = 1;
 		$cell = 1;
 	?>
-	<section id="g<?= $gid ?>" class="guild-card">
+<section id="g<?= $gid ?>" class="guild-card">
 	<div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
 		<div class="guild-actions">
 			<h3>
@@ -77,29 +77,22 @@ $fmtDateDe = static function(string $ymd): string {
 				</a>
 			</h3>
 
-		<?php if (empty($filterGuildId)): ?>
-			<a class="btn" style="padding:2px 10px; font-size:0.9em;"
-			   href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>&g=<?= (int)$gid ?>#g<?= (int)$gid ?>">
-				Einzeln
-			</a>
-		<?php endif; ?>
+			<?php if (empty($filterGuildId)): ?>
+				<a class="btn" style="padding:2px 10px; font-size:0.9em;"
+				   href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>&g=<?= (int)$gid ?>#g<?= (int)$gid ?>">
+					Einzeln
+				</a>
+			<?php endif; ?>
+		</div>
+
+		<div class="muted">
+			Monat: <strong><?= (int)$tot['t'] ?></strong> —
+			A: <strong><?= (int)$tot['a'] ?></strong> /
+			V: <strong><?= (int)$tot['d'] ?></strong>
+		</div>
 	</div>
 
-	<div class="muted">
-		Monat: <strong><?= (int)$tot['t'] ?></strong> —
-		A: <strong><?= (int)$tot['a'] ?></strong> /
-		V: <strong><?= (int)$tot['d'] ?></strong>
-	</div>
-</div>
-
-	<div class="muted">
-		Monat: <strong><?= (int)$tot['t'] ?></strong> —
-		A: <strong><?= (int)$tot['a'] ?></strong> /
-		V: <strong><?= (int)$tot['d'] ?></strong>
-	</div>
-</div>
-
-		<table class="table" style="margin-top:10px; table-layout:fixed; width:100%;">
+	<table class="table" style="margin-top:10px; table-layout:fixed; width:100%;">
 			<thead>
 				<tr>
 					<?php foreach ($wd as $n): ?>
