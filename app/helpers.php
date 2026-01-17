@@ -103,25 +103,37 @@
 		return $v;
 	}
 	
-	function row_class(array $m): string
-	{
-		$classes = ["row"];
-		
-		if (!empty($m["fired_at"]) || !empty($m["left_at"])) {
-			$classes[] = "row-muted";
-		}
-		
-		if (!empty($m["days_offline"]) && (int) $m["days_offline"] >= 14) {
-			$classes[] = "row-warn";
-		}
-		
-		if (!empty($m["mentor"])) {
-			$classes[] = "row-bold";
-		}
-		
-		return implode(" ", $classes);
+function row_class(array $m): string
+{
+	$classes = ["row"];
+
+	$fired = trim((string) ($m["fired_at"] ?? ""));
+	$left  = trim((string) ($m["left_at"] ?? ""));
+
+	if ($fired !== "") {
+		$classes[] = "row-fired";
+	} elseif ($left !== "") {
+		$classes[] = "row-left";
 	}
-	
+
+	$days = null;
+	if (isset($m["days_offline"]) && $m["days_offline"] !== "" && $m["days_offline"] !== null) {
+		$days = (int) $m["days_offline"];
+	} else {
+		$days = memberDaysOffline($m); // negative Werte bleiben absichtlich so
+	}
+
+	if ($days !== null && $days !== 0 && abs($days) >= 14) {
+		$classes[] = "row-bold";
+	}
+
+	if (!empty($m["mentor"])) {
+		$classes[] = "row-bold";
+	}
+
+	return implode(" ", $classes);
+}
+
 	function isAdmin(): bool
 	{
 		// App-Login (users Tabelle) ODER vorgeschaltetes BasicAuth (bootstrap setzt is_admin/admin_username)
