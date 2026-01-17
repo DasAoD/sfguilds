@@ -19,6 +19,7 @@
 	
 	<form method="post" action="<?= e(url("/admin/")) ?>" class="form" style="max-width:520px;">
         <input type="hidden" name="action" value="create_first_user">
+		<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 		
         <label>Benutzername
 			<input type="text" name="username" required>
@@ -69,6 +70,7 @@
 			<form method="post" action="<?= e(url("/admin/")) ?>" class="guild-form">
 				<input type="hidden" name="action" value="update_guild">
 				<input type="hidden" name="id" value="<?= (int) $editGuild["id"] ?>">
+				<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 				
 				<div class="grid">
 					<div class="field">
@@ -113,6 +115,7 @@
 			<h3>Gilde anlegen</h3>
 			<form method="post" action="<?= e(url("/admin/")) ?>" class="guild-form">
 				<input type="hidden" name="action" value="add_guild">
+				<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 				
 				<!-- 2-Spalten-Layout: Name/Server oben, Tag/Notiz darunter -->
 				<div class="grid">
@@ -178,6 +181,7 @@
 								<form method="post" action="<?= e(url("/admin/")) ?>" style="display:inline;">
 									<input type="hidden" name="action" value="delete_guild">
 									<input type="hidden" name="id" value="<?= (int) $g["id"] ?>">
+									<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 									<button class="small danger" type="submit" onclick="return confirm('Gilde wirklich löschen?');">
 										Löschen
 									</button>
@@ -199,6 +203,7 @@
 			
 			<form method="post" action="<?= e(url("/admin/")) ?>" class="form">
 				<input type="hidden" name="action" value="add_user">
+				<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 				
 				<label>Benutzername
 					<input type="text" name="username" required>
@@ -242,6 +247,7 @@
 										) ?>" style="display:inline-block; margin-left:10px;">
 										<input type="hidden" name="action" value="change_user_password">
 										<input type="hidden" name="id" value="<?= (int) $u["id"] ?>">
+										<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 										
 										<input type="password" name="password" placeholder="Neues Passwort" autocomplete="new-password" required>
 										<input type="password" name="password2" placeholder="Wiederholen" autocomplete="new-password" required>
@@ -253,6 +259,7 @@
 								<form method="post" action="<?= e(url("/admin/")) ?>" style="display:inline;">
 									<input type="hidden" name="action" value="delete_user">
 									<input type="hidden" name="id" value="<?= (int) $u["id"] ?>">
+									<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 									<button class="btn danger" type="submit"
 									onclick="return confirm('User wirklich löschen?');"
 									style="margin-left:10px;">
