@@ -38,6 +38,7 @@
 	$msg_err = flash_get("err");
 	
 	if ($_SERVER["REQUEST_METHOD"] === "POST") {
+		csrf_check();
 		$action = (string) ($_POST["action"] ?? "");
 		
 		try {
