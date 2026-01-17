@@ -26,6 +26,8 @@ storage/import/
 storage/import/archive/*.csv
 storage/import/import.lock
 storage/import/import.log
+storage/.deplock.lock
+storage/*.sqlite.bak_*
 public/uploads/
 public/uploads/crest/*.webp
 storage/allow_setup
