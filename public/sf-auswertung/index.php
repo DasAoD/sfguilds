@@ -69,6 +69,7 @@ ob_start();
 <?php endif; ?>
 
 <form method="post" style="margin-top: 12px; max-width: 900px;">
+    <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
   <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 720px;">
     <label>
       <div>Meine Gilde</div>
