@@ -5,12 +5,36 @@
 // $countsByGuild, $monthTotalsByGuild
 // $selectedGuildId, $selectedDate, $detailsRows
 ?>
+<style>
+	.guild-grid-wrap { max-width: 1400px; margin: 0 auto; }
+	.guild-grid {
+		display: grid;
+		gap: 18px;
+		grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+		align-items: start;
+	}
+	@media (max-width: 1150px) {
+		.guild-grid { grid-template-columns: 1fr; }
+	}
+	.guild-card {
+		padding: 14px;
+		border: 1px solid rgba(255,255,255,0.10);
+		border-radius: 14px;
+		background: rgba(255,255,255,0.03);
+	}
+	.guild-card h3 { margin: 0; }
+	.guild-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+</style>
+
 <h2>Kämpfe – Monatsübersicht</h2>
 
 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: 10px 0 16px;">
 	<a class="btn" href="?m=<?= htmlspecialchars($prevMonth, ENT_QUOTES, 'UTF-8') ?>">‹</a>
 	<strong style="font-size:1.1em;"><?= htmlspecialchars($monthTitle, ENT_QUOTES, 'UTF-8') ?></strong>
 	<a class="btn" href="?m=<?= htmlspecialchars($nextMonth, ENT_QUOTES, 'UTF-8') ?>">›</a>
+	<?php if (!empty($filterGuildId)): ?>
+	<a class="btn" href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>">Alle Gilden</a>
+	<?php endif; ?>
 
 	<span class="muted" style="margin-left:10px;">
 		Tipp: Klick auf einen Tag mit Kämpfen → Details erscheinen darunter.
@@ -30,6 +54,9 @@ $fmtDateDe = static function(string $ymd): string {
 };
 ?>
 
+<div class="guild-grid-wrap">
+<div class="guild-grid">
+
 <?php foreach ($guilds as $g): ?>
 	<?php
 		$gid = (int)$g['id'];
@@ -41,15 +68,36 @@ $fmtDateDe = static function(string $ymd): string {
 		$day = 1;
 		$cell = 1;
 	?>
-	<section id="g<?= $gid ?>" style="margin: 18px 0 24px;">
-		<div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-			<h3 style="margin: 0;"><?= $e($name) ?></h3>
-			<div class="muted">
-				Monat: <strong><?= (int)$tot['t'] ?></strong> —
-				A: <strong><?= (int)$tot['a'] ?></strong> /
-				V: <strong><?= (int)$tot['d'] ?></strong>
-			</div>
-		</div>
+	<section id="g<?= $gid ?>" class="guild-card">
+	<div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+		<div class="guild-actions">
+			<h3>
+				<a href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>&g=<?= (int)$gid ?>#g<?= (int)$gid ?>" style="text-decoration:none;">
+					<?= $e($name) ?>
+				</a>
+			</h3>
+
+		<?php if (empty($filterGuildId)): ?>
+			<a class="btn" style="padding:2px 10px; font-size:0.9em;"
+			   href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>&g=<?= (int)$gid ?>#g<?= (int)$gid ?>">
+				Einzeln
+			</a>
+		<?php endif; ?>
+	</div>
+
+	<div class="muted">
+		Monat: <strong><?= (int)$tot['t'] ?></strong> —
+		A: <strong><?= (int)$tot['a'] ?></strong> /
+		V: <strong><?= (int)$tot['d'] ?></strong>
+	</div>
+</div>
+
+	<div class="muted">
+		Monat: <strong><?= (int)$tot['t'] ?></strong> —
+		A: <strong><?= (int)$tot['a'] ?></strong> /
+		V: <strong><?= (int)$tot['d'] ?></strong>
+	</div>
+</div>
 
 		<table class="table" style="margin-top:10px; table-layout:fixed; width:100%;">
 			<thead>
@@ -89,8 +137,10 @@ $fmtDateDe = static function(string $ymd): string {
 							}
 
 							$hasAny = ((int)$counts['t'] > 0);
-							$link = '?m=' . rawurlencode($monthKey) . '&gid=' . $gid . '&d=' . rawurlencode($date) . '#g' . $gid;
-							$clear = '?m=' . rawurlencode($monthKey) . '#g' . $gid;
+							$base = '?m=' . rawurlencode($monthKey);
+							if (!empty($filterGuildId)) $base .= '&g=' . (int)$filterGuildId;
+							$link  = $base . '&gid=' . $gid . '&d=' . rawurlencode($date) . '#g' . $gid;
+							$clear = $base . '#g' . $gid;
 						?>
 						<td style="<?= $cellStyle ?>">
 							<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
@@ -151,3 +201,6 @@ $fmtDateDe = static function(string $ymd): string {
 		<?php endif; ?>
 	</section>
 <?php endforeach; ?>
+</div>
+</div>
+
