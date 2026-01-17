@@ -1,5 +1,11 @@
 <?php
-function a_active(string $href, string $label, string $class = 'btn', bool $prefix = false): string
+function a_active(
+    string $href,
+    string $label,
+    string $class = 'btn',
+    bool $prefix = false,
+    array $excludePrefixes = []
+): string
 {
     $reqPath  = (string)(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
     $hrefPath = (string)(parse_url($href, PHP_URL_PATH) ?? $href);
@@ -16,6 +22,19 @@ function a_active(string $href, string $label, string $class = 'btn', bool $pref
     $active = $prefix && $target !== '/'
         ? ($req === $target || str_starts_with($req . '/', $target . '/'))
         : ($req === $target);
+
+    // Excludes: wenn Request in einem ausgeschlossenen Prefix liegt -> nicht aktiv
+    if ($active && $excludePrefixes) {
+        foreach ($excludePrefixes as $ex) {
+            if (!is_string($ex) || $ex === '') continue;
+            $exNorm = $norm($ex);
+
+            if ($exNorm !== '/' && ($req === $exNorm || str_starts_with($req . '/', $exNorm . '/'))) {
+                $active = false;
+                break;
+            }
+        }
+    }
 
     $cls  = trim($class . ($active ? ' active' : ''));
     $aria = $active ? ' aria-current="page"' : '';
@@ -40,7 +59,7 @@ $title = $title ?? "S&F Guilds";
 				<nav class="nav">
 					<?= a_active('/', 'Home', 'btn') ?>
 					<?php if (isAdmin()): ?>
-						<?= a_active('/sf-auswertung/', 'SF Auswertung', 'btn', true) ?>
+						<?= a_active('/sf-auswertung/', 'SF Auswertung', 'btn', true, ['/sf-auswertung/kaempfe/']) ?>
 						<?= a_active('/sf-auswertung/kaempfe/', 'Kämpfe', 'btn') ?>
 						<?= a_active('/admin/', 'Admin', 'btn', true) ?>
 						<a class="btn" href="<?= e(url('/admin/logout.php')) ?>">Logout</a>
