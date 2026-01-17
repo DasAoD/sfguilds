@@ -3,6 +3,16 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../app/bootstrap.php';
 
+$isAdminUser = function_exists('isAdmin') ? (bool)isAdmin() : false;
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+	session_start();
+}
+if (empty($_SESSION['csrf_token'])) {
+	$_SESSION['csrf_token'] = bin2hex(random_bytes(16));
+}
+$csrfToken = $_SESSION['csrf_token'];
+
 $title = 'Kämpfe';
 
 // optional: Admin-Schutz, falls vorhanden
@@ -31,6 +41,70 @@ if (!$pdo) {
 		PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 		PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 	]);
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+	if (!$isAdminUser) {
+		http_response_code(403);
+		echo "Forbidden";
+		exit;
+	}
+
+	$token = (string)($_POST['csrf_token'] ?? '');
+	if (!hash_equals($csrfToken, $token)) {
+		http_response_code(400);
+		echo "Bad Request (CSRF)";
+		exit;
+	}
+
+	$action = (string)($_POST['action'] ?? '');
+
+	// Redirect: zurück zur aktuellen Ansicht
+	$m = (string)($_POST['m'] ?? '');
+	$g = (int)($_POST['g'] ?? 0);
+	$gid = (int)($_POST['gid'] ?? 0);
+	$d = (string)($_POST['d'] ?? '');
+
+	$qs = [];
+	if (preg_match('/^\d{4}-\d{2}$/', $m)) $qs[] = 'm=' . rawurlencode($m);
+	if ($g > 0) $qs[] = 'g=' . $g;
+	if ($gid > 0 && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+		$qs[] = 'gid=' . $gid;
+		$qs[] = 'd=' . rawurlencode($d);
+	}
+	$redirect = '/sf-auswertung/kaempfe/' . ($qs ? ('?' . implode('&', $qs)) : '');
+	if ($gid > 0) $redirect .= '#g' . $gid;
+
+	try {
+		if ($action === 'delete_battle') {
+			$battleId = (int)($_POST['battle_id'] ?? 0);
+			if ($battleId > 0) {
+				$pdo->beginTransaction();
+				$st = $pdo->prepare("DELETE FROM sf_eval_participants WHERE battle_id = :id");
+				$st->execute([':id' => $battleId]);
+
+				$st = $pdo->prepare("DELETE FROM sf_eval_battles WHERE id = :id");
+				$st->execute([':id' => $battleId]);
+				$pdo->commit();
+			}
+		} elseif ($action === 'move_battle') {
+			$battleId = (int)($_POST['battle_id'] ?? 0);
+			$newGuildId = (int)($_POST['new_guild_id'] ?? 0);
+
+			if ($battleId > 0 && $newGuildId > 0) {
+				$st = $pdo->prepare("UPDATE sf_eval_battles SET guild_id = :g WHERE id = :id");
+				$st->execute([':g' => $newGuildId, ':id' => $battleId]);
+			}
+		}
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) $pdo->rollBack();
+		http_response_code(500);
+		echo "Server Error";
+		exit;
+	}
+
+	header('Location: ' . $redirect);
+	exit;
 }
 
 // --- Helpers
@@ -139,7 +213,7 @@ while ($r = $stmtAgg->fetch()) {
 $detailsRows = [];
 if ($selectedGuildId > 0 && $selectedDate !== '') {
 	$sqlDetail = "
-		SELECT battle_time, battle_type, opponent_guild
+		SELECT id, battle_time, battle_type, opponent_guild
 		FROM sf_eval_battles
 		WHERE guild_id = :gid AND battle_date = :d
 		ORDER BY battle_time DESC, id DESC
@@ -153,6 +227,7 @@ if ($selectedGuildId > 0 && $selectedDate !== '') {
 
 	while ($row = $stmtDetail->fetch()) {
 		$detailsRows[] = [
+			'id'   => (int)$row['id'],
 			'time' => (string)$row['battle_time'],
 			'kind' => $mapType((string)$row['battle_type']),
 			'opp'  => (string)$row['opponent_guild'],
