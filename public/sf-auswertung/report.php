@@ -793,6 +793,26 @@ $inactiveCount = count($playersInactive);
 
 <div class="sf-report">
 
+<?php if ($guildId > 0): ?>
+  <div class="sf-card" style="padding:10px 12px; margin-bottom:12px;">
+    <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
+      <?php foreach ($guilds as $g): ?>
+        <?php
+          $gid = (int)($g['id'] ?? 0);
+          if ($gid <= 0) continue;
+
+          $href = url('/sf-auswertung/report.php?guild_id=' . $gid);
+          $cls  = 'btn' . ($gid === (int)$guildId ? ' active' : '');
+          $label = (string)($g['name'] ?? '');
+        ?>
+        <a class="<?= e($cls) ?>" href="<?= e($href) ?>" style="white-space:nowrap; padding:6px 12px; border-radius:999px;">
+          <?= e($label) ?>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  </div>
+<?php endif; ?>
+
   <div class="sf-topbar">
     <div style="display:flex; gap:14px; align-items:center;">
       <?php if ($guild && !empty($guild['crest_file'])): ?>
@@ -806,9 +826,9 @@ $inactiveCount = count($playersInactive);
       <div class="sf-titleblock">
         <h2 style="margin:0;">
           <?php if ($guild): ?>
-            SF-Auswertung · <?= e($guild['server']) ?> – <?= e($guild['name']) ?>
+            <?= e($guild['server']) ?> · <?= e($guild['name']) ?> (Report)
           <?php else: ?>
-            SF-Auswertung · Report
+            Reports
           <?php endif; ?>
         </h2>
 
@@ -818,27 +838,9 @@ $inactiveCount = count($playersInactive);
           <?php elseif ($guild): ?>
             Letzte Aktualisierung: <strong>–</strong>
           <?php else: ?>
-            Bitte wähle eine Gilde für den SF-Report aus:
+            Bitte wähle eine Gilde für den Report aus:
           <?php endif; ?>
         </div>
-        <?php if ($guildId > 0): ?>
-        <div style="margin-top:10px; display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; max-width: min(820px, 70vw);">
-        <?php foreach ($guilds as $g): ?>
-        <?php
-        $gid = (int)($g['id'] ?? 0);
-        if ($gid <= 0) continue;
-
-        $href = url('/sf-auswertung/report.php?guild_id=' . $gid);
-        $cls  = 'btn' . ($gid === (int)$guildId ? ' active' : '');
-        $label = (string)($g['name'] ?? '');
-      ?>
-      <a class="<?= e($cls) ?>" href="<?= e($href) ?>" style="white-space:nowrap; padding:6px 12px; border-radius:999px;">
-        <?= e($label) ?>
-      </a>
-    <?php endforeach; ?>
-  </div>
-<?php endif; ?>
-
       </div>
     </div>
 
