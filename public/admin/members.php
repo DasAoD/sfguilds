@@ -713,7 +713,6 @@
 		<p class="muted" style="margin-top:0;">
 			Import macht Insert/Update anhand von <strong>Name</strong>. Es wird <strong>nichts gelöscht</strong>.
 			Entlassen/Verlassen/Notizen werden nur überschrieben, wenn die CSV dort Werte enthält.
-			<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 		</p>
 		<form method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>" enctype="multipart/form-data">
 				<input type="hidden" name="action" value="import_csv">
