@@ -104,7 +104,7 @@ Standard-Installationspfad (Beispiel):
 ```
 ---
 
-In Arbeit:
+wip:
 - Auswertung für Gildenangriffe und -verteidigung pro Gilde.
 
 ## Lizenz
