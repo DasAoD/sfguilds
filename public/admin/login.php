@@ -16,6 +16,7 @@
 	$error = "";
 	
 	if ($_SERVER["REQUEST_METHOD"] === "POST") {
+		csrf_check();
 		$username = trim((string) ($_POST["username"] ?? ""));
 		$password = (string) ($_POST["password"] ?? "");
 		
