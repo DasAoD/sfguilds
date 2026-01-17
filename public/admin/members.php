@@ -1,4 +1,4 @@
-<?php
+	<?php
 	require_once __DIR__ . "/../../app/bootstrap.php";
 	requireAdmin();
 	
@@ -676,28 +676,25 @@
 			</div>
 			
 			<form method="post"
-			action="/admin/crest.php"
+			      action="/admin/crest.php"
+			      enctype="multipart/form-data"
+			      style="display:flex; align-items:center; gap:8px; margin:0; flex-wrap:wrap;">
 				<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
-			enctype="multipart/form-data"
-			style="display:flex; align-items:center; gap:8px; margin:0; flex-wrap:wrap;">
 				<input type="hidden" name="action" value="upload">
 				<input type="hidden" name="guild_id" value="<?= (int) $guildId ?>">
-				<input type="hidden" name="return_to" value="<?= h(
-					"/admin/members.php?guild_id=" . (int) $guildId,
-				) ?>">
+				<input type="hidden" name="return_to" value="<?= h("/admin/members.php?guild_id=" . (int) $guildId) ?>">
 				<input type="file" name="crest" accept="image/png,image/jpeg,image/webp" required>
 				<button type="submit">Upload</button>
 			</form>
+
 		</div>
 		<div class="row" style="align-items:center; gap:12px; flex-wrap:wrap;">
-			<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 			<?php if (!empty($guild["crest_file"])): ?>
 			<form method="post" action="/admin/crest.php" style="margin:0;">
+				<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 				<input type="hidden" name="action" value="delete">
 				<input type="hidden" name="guild_id" value="<?= (int) $guildId ?>">
-				<input type="hidden" name="return_to" value="<?= h(
-					"/admin/members.php?guild_id=" . (int) $guildId,
-				) ?>">
+				<input type="hidden" name="return_to" value="<?= h("/admin/members.php?guild_id=" . (int) $guildId) ?>">
 				<button type="submit" onclick="return confirm('Wappen wirklich löschen?');">Löschen</button>
 			</form>
 			<?php endif; ?>
@@ -719,11 +716,12 @@
 			<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 		</p>
 		<form method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>" enctype="multipart/form-data">
-			<input type="hidden" name="action" value="import_csv">
-			<input type="hidden" name="guild_id" value="<?= (int) $guildId ?>">
-			<input type="file" name="csv_file" accept=".csv,text/csv">
-			<button type="submit">Import starten</button>
-		</form>
+				<input type="hidden" name="action" value="import_csv">
+				<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+				<input type="hidden" name="guild_id" value="<?= (int) $guildId ?>">
+				<input type="file" name="csv_file" accept=".csv,text/csv">
+				<button type="submit">Import starten</button>
+			</form>
 	</div>
 	
 	<?php if (!empty($missing)): ?>
@@ -746,13 +744,13 @@
 			) ?></a></li>
 			<?php endforeach; ?>
 		</ul>
-		<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 		
-		<form method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>" style="margin-top: .75rem;">
-			<input type="hidden" name="action" value="clear_missing">
-			<input type="hidden" name="guild_id" value="<?= (int) $guildId ?>">
-			<button type="submit">Liste ausblenden</button>
-		</form>
+			<form method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>" style="margin-top: .75rem;">
+				<input type="hidden" name="action" value="clear_missing">
+				<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+				<input type="hidden" name="guild_id" value="<?= (int) $guildId ?>">
+				<button type="submit">Liste ausblenden</button>
+			</form>
 	</div>
 	<?php endif; ?>
 	
@@ -805,10 +803,10 @@
 					<td><textarea form="<?= $formId ?>" name="notes" rows="2" style="width:100%;"><?= h(
 						$m["notes"] ?? "",
 					) ?></textarea></td>
-					<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 					<td style="white-space:nowrap;">
 						<form id="<?= $formId ?>" method="post" action="/admin/members.php?guild_id=<?= (int) $guildId ?>#m<?= $mid ?>">
 							<input type="hidden" name="action" value="save_member">
+							<input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
 							<input type="hidden" name="guild_id" value="<?= (int) $guildId ?>">
 							<input type="hidden" name="member_id" value="<?= $mid ?>">
 							<button type="submit">Speichern</button>
