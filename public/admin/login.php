@@ -6,6 +6,7 @@
 	$next = (string) ($_GET["next"] ?? ($_POST["next"] ?? "/"));
 	if ($next === "" || $next[0] !== "/" || str_starts_with($next, "//")) {
 		$next = "/";
+		<input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
 	}
 	
 	if (isAdmin()) {
