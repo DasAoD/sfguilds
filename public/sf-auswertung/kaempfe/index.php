@@ -80,8 +80,16 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selectedDate) || substr($selectedDate,
 	$selectedGuildId = 0;
 }
 
+$filterGuildId = isset($_GET['g']) ? (int)$_GET['g'] : 0; // Einzelansicht: ?g=2
+
 // --- Gilden laden
 $guilds = $pdo->query("SELECT id, name FROM guilds ORDER BY name")->fetchAll();
+
+if ($filterGuildId > 0) {
+	$guilds = array_values(array_filter($guilds, static function($x) use ($filterGuildId) {
+		return (int)$x['id'] === $filterGuildId;
+	}));
+}
 
 // --- Monats-Aggregation laden
 // Ergebnis: countsByGuild[gid][day] = ['a'=>x,'d'=>y,'t'=>x+y]
