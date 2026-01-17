@@ -116,6 +116,7 @@
 		Clear missing list
 	-------------------------- */
 	if ($_SERVER["REQUEST_METHOD"] === "POST" && $action === "clear_missing") {
+		csrf_check();
 		unset(
         $_SESSION["_missing_members"][$guildId],
         $_SESSION["_missing_members_ts"][$guildId],
@@ -128,6 +129,7 @@
 		CSV Import
 	-------------------------- */
 	if ($_SERVER["REQUEST_METHOD"] === "POST" && $action === "import_csv") {
+		csrf_check();
 		if ($guildId <= 0) {
 			flash("err", "Bitte zuerst eine Gilde auswählen.");
 			redirect("/admin/members.php");
@@ -475,6 +477,7 @@
 		Save manual fields
 	-------------------------- */
 	if ($_SERVER["REQUEST_METHOD"] === "POST" && $action === "save_member") {
+		csrf_check();
 		$guildIdPost = (int) ($_POST["guild_id"] ?? 0);
 		$memberId = (int) ($_POST["member_id"] ?? 0);
 		if ($guildIdPost > 0) {
