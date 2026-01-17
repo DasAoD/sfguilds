@@ -794,7 +794,6 @@ $inactiveCount = count($playersInactive);
 <div class="sf-report">
 
 <?php if ($guildId > 0): ?>
-  //<div class="sf-card" style="padding:10px 12px; margin-bottom:12px;">
     <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
       <?php foreach ($guilds as $g): ?>
         <?php
@@ -810,7 +809,6 @@ $inactiveCount = count($playersInactive);
         </a>
       <?php endforeach; ?>
     </div>
-  //</div>
 <?php endif; ?>
 
   <div class="sf-topbar">
