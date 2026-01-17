@@ -12,8 +12,8 @@ if (function_exists('isAdmin') && !isAdmin()) {
 	exit;
 }
 
-$perGuildLimit = 200;  // Einträge pro Gilde anzeigen
-$scanLimit     = 5000; // wie viele Battles insgesamt scannen
+$perGuildLimit = 200;  // Details-Limit pro Tag (falls mal sehr viele Kämpfe am selben Tag)
+$scanLimit     = 40000; // Monats-Aggregation: reicht locker, ist aber eh GROUP BY
 
 // --- PDO finden oder fallback auf SQLite-Datei
 $pdo = null;
@@ -33,27 +33,7 @@ if (!$pdo) {
 	]);
 }
 
-// --- Gilden laden
-$guilds = $pdo->query("SELECT id, name FROM guilds ORDER BY name")->fetchAll();
-
-$rowsByGuild = [];
-$counts = [];
-foreach ($guilds as $g) {
-	$gid = (int)$g['id'];
-	$rowsByGuild[$gid] = [];
-	$counts[$gid] = 0;
-}
-
-// --- Spalten prüfen (damit die Seite nicht crasht, falls Schema mal abweicht)
-$info = $pdo->query("PRAGMA table_info(sf_eval_battles)")->fetchAll();
-$cols = array_map(static fn($r) => (string)$r['name'], $info);
-
-$need = ['guild_id', 'battle_type', 'battle_date', 'battle_time'];
-$hasAll = true;
-foreach ($need as $c) {
-	if (!in_array($c, $cols, true)) { $hasAll = false; break; }
-}
-
+// --- Helpers
 $mapType = static function(string $t): string {
 	$t = strtolower(trim($t));
 	if ($t === 'attack') return 'Angriff';
@@ -61,47 +41,118 @@ $mapType = static function(string $t): string {
 	return 'Kampf';
 };
 
-$fmtWhen = static function(string $date, string $time): string {
-	// DB: 2026-01-16 + 17:45 -> Anzeige: 16.01.2026 17:45
-	$dt = DateTime::createFromFormat('Y-m-d H:i', $date . ' ' . $time);
-	if ($dt instanceof DateTime) return $dt->format('d.m.Y H:i');
-	// fallback
-	return trim($date . ' ' . $time);
+$fmtDateDe = static function(string $ymd): string {
+	$dt = DateTime::createFromFormat('Y-m-d', $ymd);
+	return $dt ? $dt->format('d.m.Y') : $ymd;
 };
 
-if ($hasAll) {
-	$sql = "
-		SELECT guild_id, battle_type, battle_date, battle_time
-		FROM sf_eval_battles
-		ORDER BY battle_date DESC, battle_time DESC, id DESC
-		LIMIT :lim
-	";
-	$stmt = $pdo->prepare($sql);
-	$stmt->bindValue(':lim', $scanLimit, PDO::PARAM_INT);
-	$stmt->execute();
+$monthNamesDe = [
+	1 => 'Januar', 2 => 'Februar', 3 => 'März', 4 => 'April', 5 => 'Mai', 6 => 'Juni',
+	7 => 'Juli', 8 => 'August', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Dezember'
+];
 
-	$done = 0;
-	$totalGuilds = count($guilds);
-
-	while ($row = $stmt->fetch()) {
-		$gid = (int)$row['guild_id'];
-		if (!isset($rowsByGuild[$gid]) || $counts[$gid] >= $perGuildLimit) continue;
-
-		$when = $fmtWhen((string)$row['battle_date'], (string)$row['battle_time']);
-		$kind = $mapType((string)$row['battle_type']);
-
-		$rowsByGuild[$gid][] = ['when' => $when, 'kind' => $kind];
-		$counts[$gid]++;
-
-		if ($counts[$gid] === $perGuildLimit) $done++;
-		if ($done >= $totalGuilds) break;
+// --- Monat bestimmen: ?m=YYYY-MM, default = Monat des neuesten Kampfes (falls vorhanden)
+$monthKey = isset($_GET['m']) && is_string($_GET['m']) ? trim($_GET['m']) : '';
+if (!preg_match('/^\d{4}-\d{2}$/', $monthKey)) {
+	$latest = $pdo->query("SELECT battle_date FROM sf_eval_battles ORDER BY battle_date DESC, battle_time DESC, id DESC LIMIT 1")->fetchColumn();
+	if (is_string($latest) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $latest)) {
+		$monthKey = substr($latest, 0, 7);
+	} else {
+		$monthKey = date('Y-m');
 	}
-} else {
-	// Schema passt nicht -> Seite zeigt wenigstens leer statt kaputt
-	// (hier könnten wir später noch einen Fallback einbauen)
 }
 
-// --- Rendern über Layout (Layout erwartet i.d.R. $view)
+$monthStart = new DateTimeImmutable($monthKey . '-01');
+$monthEnd   = $monthStart->modify('last day of this month');
+$daysInMonth = (int)$monthStart->format('t');
+$firstWeekday = (int)$monthStart->format('N'); // 1=Mo ... 7=So
+
+$prevMonth = $monthStart->modify('-1 month')->format('Y-m');
+$nextMonth = $monthStart->modify('+1 month')->format('Y-m');
+
+$monthTitle = ($monthNamesDe[(int)$monthStart->format('n')] ?? $monthStart->format('m')) . ' ' . $monthStart->format('Y');
+
+// --- Selected day (Details)
+$selectedGuildId = isset($_GET['gid']) ? (int)$_GET['gid'] : 0;
+$selectedDate = isset($_GET['d']) && is_string($_GET['d']) ? trim($_GET['d']) : '';
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selectedDate) || substr($selectedDate, 0, 7) !== $monthKey) {
+	$selectedDate = '';
+	$selectedGuildId = 0;
+}
+
+// --- Gilden laden
+$guilds = $pdo->query("SELECT id, name FROM guilds ORDER BY name")->fetchAll();
+
+// --- Monats-Aggregation laden
+// Ergebnis: countsByGuild[gid][day] = ['a'=>x,'d'=>y,'t'=>x+y]
+$countsByGuild = [];
+$monthTotalsByGuild = [];
+
+foreach ($guilds as $g) {
+	$gid = (int)$g['id'];
+	$countsByGuild[$gid] = [];
+	$monthTotalsByGuild[$gid] = ['a' => 0, 'd' => 0, 't' => 0];
+}
+
+$sqlAgg = "
+	SELECT guild_id,
+	       battle_date,
+	       SUM(CASE WHEN battle_type='attack'  THEN 1 ELSE 0 END) AS attacks,
+	       SUM(CASE WHEN battle_type='defense' THEN 1 ELSE 0 END) AS defenses
+	FROM sf_eval_battles
+	WHERE battle_date BETWEEN :start AND :end
+	GROUP BY guild_id, battle_date
+";
+$stmtAgg = $pdo->prepare($sqlAgg);
+$stmtAgg->execute([
+	':start' => $monthStart->format('Y-m-d'),
+	':end'   => $monthEnd->format('Y-m-d'),
+]);
+
+while ($r = $stmtAgg->fetch()) {
+	$gid = (int)$r['guild_id'];
+	if (!isset($countsByGuild[$gid])) continue;
+
+	$date = (string)$r['battle_date']; // YYYY-MM-DD
+	$day  = (int)substr($date, 8, 2);
+
+	$a = (int)$r['attacks'];
+	$d = (int)$r['defenses'];
+	$t = $a + $d;
+
+	$countsByGuild[$gid][$day] = ['a' => $a, 'd' => $d, 't' => $t];
+
+	$monthTotalsByGuild[$gid]['a'] += $a;
+	$monthTotalsByGuild[$gid]['d'] += $d;
+	$monthTotalsByGuild[$gid]['t'] += $t;
+}
+
+// --- Tagesdetails laden (nur wenn ausgewählt)
+$detailsRows = [];
+if ($selectedGuildId > 0 && $selectedDate !== '') {
+	$sqlDetail = "
+		SELECT battle_time, battle_type, opponent_guild
+		FROM sf_eval_battles
+		WHERE guild_id = :gid AND battle_date = :d
+		ORDER BY battle_time DESC, id DESC
+		LIMIT :lim
+	";
+	$stmtDetail = $pdo->prepare($sqlDetail);
+	$stmtDetail->bindValue(':gid', $selectedGuildId, PDO::PARAM_INT);
+	$stmtDetail->bindValue(':d', $selectedDate, PDO::PARAM_STR);
+	$stmtDetail->bindValue(':lim', $perGuildLimit, PDO::PARAM_INT);
+	$stmtDetail->execute();
+
+	while ($row = $stmtDetail->fetch()) {
+		$detailsRows[] = [
+			'time' => (string)$row['battle_time'],
+			'kind' => $mapType((string)$row['battle_type']),
+			'opp'  => (string)$row['opponent_guild'],
+		];
+	}
+}
+
+// --- Rendern über Layout ($content, damit es zu deinem layout.php passt)
 $viewFile = __DIR__ . '/../../../app/views/sf_eval_fights.php';
 
 ob_start();
