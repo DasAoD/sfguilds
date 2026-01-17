@@ -78,6 +78,104 @@ function sf_rank_group($rank): int
     return 2;
 }
 
+function sf_sqlite_table_exists(PDO $pdo, string $table): bool
+{
+    try {
+        $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver !== 'sqlite') return false;
+
+        $st = $pdo->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?");
+        $st->execute([$table]);
+        return (bool)$st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function sf_fetch_guild_cards(PDO $pdo): array
+{
+    try {
+        $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        // Fallback (nicht-sqlite): nur Gilden
+        if ($driver !== 'sqlite') {
+            $st = $pdo->query("SELECT id, name, NULL AS members_active, NULL AS last_import, NULL AS last_attack, NULL AS server, NULL AS crest_file FROM guilds ORDER BY name");
+            return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        }
+
+        $hasMembers = sf_sqlite_table_exists($pdo, 'members');
+        $hasBattles = sf_sqlite_table_exists($pdo, 'sf_eval_battles');
+
+        $parts = [
+            "g.id",
+            "g.name",
+            "g.server",
+            "g.crest_file",
+            ($hasMembers ? "(
+                SELECT COUNT(*)
+                FROM members m
+                WHERE m.guild_id = g.id
+                  AND (m.left_at  IS NULL OR TRIM(m.left_at)  = '')
+                  AND (m.fired_at IS NULL OR TRIM(m.fired_at) = '')
+            ) AS members_active" : "NULL AS members_active"),
+            ($hasBattles ? "(
+                SELECT MAX(battle_date)
+                FROM sf_eval_battles b
+                WHERE b.guild_id = g.id
+            ) AS last_import" : "NULL AS last_import"),
+            ($hasBattles ? "(
+                SELECT MAX(battle_date)
+                FROM sf_eval_battles b
+                WHERE b.guild_id = g.id
+                  AND b.battle_type = 'attack'
+            ) AS last_attack" : "NULL AS last_attack"),
+        ];
+
+        $sql = "SELECT " . implode(",\n", $parts) . "
+                FROM guilds g
+                ORDER BY g.name COLLATE NOCASE";
+
+        $st = $pdo->query($sql);
+        return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+function sf_ago_utc($ts): string
+{
+    $ts = trim((string)$ts);
+    if ($ts === '') return 'noch nicht';
+
+    try {
+        $dt  = new DateTime($ts, new DateTimeZone('UTC'));
+        $now = new DateTime('now', new DateTimeZone('UTC'));
+
+        $sec = $now->getTimestamp() - $dt->getTimestamp();
+        if ($sec < 0) $sec = 0;
+
+        if ($sec < 90) return 'gerade eben UTC';
+
+        if ($sec < 3600) {
+            $m = (int)floor($sec / 60);
+            return 'vor ' . $m . ' Minute' . ($m === 1 ? '' : 'n') . ' UTC';
+        }
+
+        if ($sec < 86400) {
+            $h = (int)floor($sec / 3600);
+            return 'vor ' . $h . ' Stunde' . ($h === 1 ? '' : 'n') . ' UTC';
+        }
+
+        $d = (int)floor($sec / 86400);
+        if ($d < 7) return 'vor ' . $d . ' Tag' . ($d === 1 ? '' : 'en') . ' UTC';
+
+        $w = (int)floor($d / 7);
+        return 'vor ' . $w . ' Woche' . ($w === 1 ? '' : 'n') . ' UTC';
+    } catch (Throwable $e) {
+        return $ts;
+    }
+}
+
 /**
  * Holt Roster-Meta aus Tabelle "members" (best effort).
  * Rückgabe:
@@ -720,48 +818,109 @@ $inactiveCount = count($playersInactive);
           <?php elseif ($guild): ?>
             Letzte Aktualisierung: <strong>–</strong>
           <?php else: ?>
-            Bitte oben eine Gilde auswählen.
+            Bitte wähle eine Gilde für den SF-Report aus:
           <?php endif; ?>
         </div>
       </div>
     </div>
 
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <a class="btn" href="<?= e($importHref) ?>">Import</a>
-      <a class="btn active" href="<?= e($reportHref) ?>">Report</a>
+      <?php if ($guildId > 0): ?>
+        <a class="btn" href="<?= e($importHref) ?>">Import</a>
+        <a class="btn active" href="<?= e($reportHref) ?>">Report</a>
 
-      <form class="sf-filters" method="get">
-        <select name="guild_id" class="sf-input" onchange="this.form.submit()">
-          <option value="0">– Gilde wählen –</option>
-          <?php foreach ($guilds as $g): ?>
-            <option value="<?= (int)$g['id'] ?>" <?= $guildId === (int)$g['id'] ? 'selected' : '' ?>>
-              <?= e($g['name']) ?> (<?= e($g['server']) ?>)
-            </option>
-          <?php endforeach; ?>
-        </select>
+        <form class="sf-filters" method="get">
+          <select name="guild_id" class="sf-input" onchange="this.form.submit()">
+            <option value="0">– Gilde wählen –</option>
+            <?php foreach ($guilds as $g): ?>
+              <option value="<?= (int)$g['id'] ?>" <?= $guildId === (int)$g['id'] ? 'selected' : '' ?>>
+                <?= e($g['name']) ?> (<?= e($g['server']) ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
 
-        <label class="sf-pill" title="Nur Spieler mit fehlenden Kämpfen anzeigen">
-          <input type="checkbox" name="missing" value="1" <?= $onlyMissing ? 'checked' : '' ?> onchange="this.form.submit()">
-          Nicht teilgenommen
-        </label>
+          <label class="sf-pill" title="Nur Spieler mit fehlenden Kämpfen anzeigen">
+            <input type="checkbox" name="missing" value="1" <?= $onlyMissing ? 'checked' : '' ?> onchange="this.form.submit()">
+            Nicht teilgenommen
+          </label>
 
-        <input class="sf-input" type="search" name="q" value="<?= e($q) ?>" placeholder="Suche…" autocomplete="off">
-        <noscript><button class="btn" type="submit">Anwenden</button></noscript>
-      </form>
+          <input class="sf-input" type="search" name="q" value="<?= e($q) ?>" placeholder="Suche…" autocomplete="off">
+          <noscript><button class="btn" type="submit">Anwenden</button></noscript>
+        </form>
+      <?php endif; ?>
     </div>
   </div>
 
   <?php if ($guildId <= 0): ?>
 
-    <div class="sf-card">
-      <p style="margin:0; opacity:.85;">Bitte oben eine Gilde auswählen.</p>
+    <?php
+      $cards = sf_fetch_guild_cards(db());
+    ?>
+
+    <div class="sf-guildgrid" style="margin-top:14px;">
+      <?php foreach ($cards as $g): ?>
+        <?php
+          $gid = (int)($g['id'] ?? 0);
+          if ($gid <= 0) continue;
+
+          $name = (string)($g['name'] ?? '');
+
+          $active = $g['members_active'] ?? null;
+          $activeText = ($active === null || $active === '') ? '–' : (string)(int)$active;
+
+          $lastImport = sf_ago_utc($g['last_import'] ?? '');
+          $lastAttack = sf_ago_utc($g['last_attack'] ?? '');
+
+          $reportUrl = url('/sf-auswertung/report.php?guild_id=' . $gid);
+          $importUrl = url('/sf-auswertung/?guild_id=' . $gid);
+        ?>
+
+        <div class="sf-card sf-guildtile">
+          <div class="sf-guildtile-title"><?= e($name) ?></div>
+
+          <div class="sf-guildtile-meta">
+            <div>Letzter Import: <?= e($lastImport) ?></div>
+            <div>Aktive Mitglieder: <strong><?= e($activeText) ?></strong></div>
+            <div>Letzter Angriff: <?= e($lastAttack) ?></div>
+          </div>
+
+          <div class="sf-guildtile-actions">
+            <a class="btn" href="<?= e($reportUrl) ?>">Report</a>
+            <a class="btn" href="<?= e($importUrl) ?>">Import</a>
+          </div>
+        </div>
+      <?php endforeach; ?>
     </div>
+
+    <style>
+      .sf-guildgrid{
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(420px, 1fr));
+        gap:18px;
+      }
+      .sf-guildtile-title{
+        font-size:26px;
+        font-weight:800;
+        margin:0 0 10px;
+      }
+      .sf-guildtile-meta{
+        opacity:.9;
+        display:grid;
+        gap:8px;
+      }
+      .sf-guildtile-actions{
+        display:flex;
+        gap:10px;
+        justify-content:flex-end;
+        margin-top:18px;
+      }
+    </style>
 
   <?php else: ?>
 
     <?php if ($totalFights <= 0): ?>
       <div class="sf-card">
-        <p style="margin:0; opacity:.85;">Noch keine Daten vorhanden. Importiere zuerst eine oder mehrere Kämpfe.</p>
+        <p style="margin:0; opacity:.85;">Für diese Gilde sind noch keine Kämpfe vorhanden. Bitte zuerst importieren.</p>
       </div>
     <?php else: ?>
 
