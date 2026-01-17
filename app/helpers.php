@@ -195,6 +195,12 @@ function row_class(array $m): string
 	
 	function memberDaysOffline(array $m): ?int
 	{
+		$fired = trim((string) ($m["fired_at"] ?? ""));
+		$left  = trim((string) ($m["left_at"] ?? ""));
+		if ($fired !== "" || $left !== "") {
+			return null; // Ex-Mitglied -> Tage offline leer lassen
+		}
+
 		// Immer aus last_online rechnen (Anzeige soll konsistent sein)
 		$lo = trim((string) ($m["last_online"] ?? ""));
 		if ($lo === "") {

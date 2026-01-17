@@ -177,58 +177,34 @@
 				continue;
 			}
 			
-			if ($k === "name") {
-				$map["name"] = $i;
-				} elseif ($k === "rang" || $k === "rank") {
-				$map["rank"] = $i;
-				} elseif ($k === "level") {
-				$map["level"] = $i;
-				} elseif ($k === "zulonline" || $k === "zulonline") {
-				$map["last_online"] = $i;
-			}
-			// (nur zur Sicherheit)
-			elseif ($k === "zulonline" || $k === "zulonline") {
-				$map["last_online"] = $i;
-				} elseif ($k === "zulonline" || $k === "zulonline") {
-				$map["last_online"] = $i;
-				} elseif ($k === "zulonline" || $k === "zulonline") {
-				$map["last_online"] = $i;
-			}
-			
-			// realer Header: "zul. Online" -> normalizeHeader => "zulonline"
-			elseif ($k === "zulonline") {
-				$map["last_online"] = $i;
-				} elseif ($k === "gildenbeitritt" || $k === "joinedat") {
-				$map["joined_at"] = $i;
-				} elseif ($k === "goldschatz" || $k === "gold") {
-				$map["gold"] = $i;
-				} elseif ($k === "lehrmeister" || $k === "mentor") {
-				$map["mentor"] = $i;
-			} elseif (
-            $k === "ritterhalle" ||
-            $k === "knighthall" ||
-            $k === "knight_hall"
-			) {
-				$map["knight_hall"] = $i;
-			} elseif (
-            $k === "gildenpet" ||
-            $k === "guild_pet" ||
-            $k === "guildpet"
-			) {
-				$map["guild_pet"] = $i;
-			} elseif (
-            $k === "tageoffline" ||
-            $k === "days_offline" ||
-            $k === "daysoffline"
-			) {
-				$map["days_offline"] = $i;
-				} elseif ($k === "entlassen" || $k === "fired_at") {
-				$map["fired_at"] = $i;
-				} elseif ($k === "verlassen" || $k === "left_at") {
-				$map["left_at"] = $i;
-				} elseif ($k === "sonstigenotizen" || $k === "notes") {
-				$map["notes"] = $i;
-			}
+						if ($k === "name") {
+							$map["name"] = $i;
+						} elseif ($k === "rang" || $k === "rank") {
+							$map["rank"] = $i;
+						} elseif ($k === "level") {
+							$map["level"] = $i;
+						} elseif ($k === "zulonline") {
+							// realer Header: "zul. Online" -> normalizeHeader => "zulonline"
+							$map["last_online"] = $i;
+						} elseif ($k === "gildenbeitritt" || $k === "joinedat") {
+							$map["joined_at"] = $i;
+						} elseif ($k === "goldschatz" || $k === "gold") {
+							$map["gold"] = $i;
+						} elseif ($k === "lehrmeister" || $k === "mentor") {
+							$map["mentor"] = $i;
+						} elseif ($k === "ritterhalle" || $k === "knighthall" || $k === "knight_hall") {
+							$map["knight_hall"] = $i;
+						} elseif ($k === "gildenpet" || $k === "guild_pet" || $k === "guildpet") {
+							$map["guild_pet"] = $i;
+						} elseif ($k === "tageoffline" || $k === "days_offline" || $k === "daysoffline") {
+							$map["days_offline"] = $i;
+						} elseif ($k === "entlassen" || $k === "fired_at") {
+							$map["fired_at"] = $i;
+						} elseif ($k === "verlassen" || $k === "left_at") {
+							$map["left_at"] = $i;
+						} elseif ($k === "sonstigenotizen" || $k === "notes") {
+							$map["notes"] = $i;
+						}
 		}
 		
 		if (!isset($map["name"])) {
@@ -549,6 +525,10 @@
 		WHERE guild_id = ?
 		ORDER BY
 		CASE
+		WHEN (fired_at IS NULL OR TRIM(fired_at) = '') AND (left_at IS NULL OR TRIM(left_at) = '') THEN 0
+		ELSE 1
+		END ASC,
+		CASE
 		WHEN rank = 'Anführer' THEN 0
 		WHEN rank = 'Offizier' THEN 1
 		ELSE 2
@@ -565,6 +545,7 @@
 		END DESC,
 		level DESC,
 		name COLLATE NOCASE
+
 		");
 		$stmt->execute([$guildId]);
 		$members = $stmt->fetchAll();

@@ -75,25 +75,34 @@
 			exit();
 		}
 		
-		$stmt = $pdo->prepare(
-        "SELECT *
-		FROM members
-		WHERE guild_id = :id
-		ORDER BY
-        CASE
-		WHEN TRIM(rank) = 'Anführer' THEN 0
-		WHEN TRIM(rank) = 'Offizier' THEN 1
-		ELSE 2
-        END ASC,
-        CASE WHEN last_online IS NULL OR last_online = '' THEN 1 ELSE 0 END,
-        CASE
-		WHEN last_online LIKE '____-__-__%' THEN substr(last_online,1,10)
-		WHEN last_online LIKE '__.__.____%' THEN substr(last_online,7,4) || '-' || substr(last_online,4,2) || '-' || substr(last_online,1,2)
-		ELSE last_online
-        END DESC,
-        level DESC,
-        name COLLATE NOCASE",
-		);
+		$stmt = $pdo->prepare("
+			SELECT *
+			FROM members
+			WHERE guild_id = :id
+			ORDER BY
+				CASE
+					WHEN (fired_at IS NULL OR TRIM(fired_at) = '')
+					AND (left_at  IS NULL OR TRIM(left_at)  = '') THEN 0
+					ELSE 1
+				END ASC,
+				CASE
+					WHEN TRIM(rank) = 'Anführer' THEN 0
+					WHEN TRIM(rank) = 'Offizier' THEN 1
+					ELSE 2
+				END ASC,
+				CASE WHEN last_online IS NULL OR last_online = '' THEN 1 ELSE 0 END,
+				CASE
+					WHEN last_online LIKE '____-__-__%' THEN substr(last_online,1,10)
+					WHEN last_online LIKE '__.__.____%' THEN substr(last_online,7,4) || '-' || substr(last_online,4,2) || '-' || substr(last_online,1,2)
+					ELSE last_online
+				END DESC,
+				CASE
+					WHEN days_offline IS NULL OR days_offline = '' THEN -999999
+					ELSE CAST(days_offline AS INTEGER)
+				END DESC,
+				level DESC,
+				name COLLATE NOCASE
+		");
 		
 		$stmt->execute([":id" => $id]);
 		$members = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -102,12 +111,8 @@
 		$fired = 0;
 		$left = 0;
 		foreach ($members as $r) {
-			if (!empty($r["fired_at"])) {
-				$fired++;
-			}
-			if (!empty($r["left_at"])) {
-				$left++;
-			}
+			if (trim((string) ($r["fired_at"] ?? "")) !== "") { $fired++; }
+			if (trim((string) ($r["left_at"] ?? "")) !== "") { $left++; }
 		}
 		$active = $total - $fired - $left;
 		
