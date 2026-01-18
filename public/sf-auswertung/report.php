@@ -94,52 +94,63 @@ function sf_sqlite_table_exists(PDO $pdo, string $table): bool
 
 function sf_fetch_guild_cards(PDO $pdo): array
 {
-    try {
-        $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+	try {
+		$driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
 
-        // Fallback (nicht-sqlite): nur Gilden
-        if ($driver !== 'sqlite') {
-            $st = $pdo->query("SELECT id, name, NULL AS members_active, NULL AS last_import, NULL AS last_attack, NULL AS server, NULL AS crest_file FROM guilds ORDER BY name");
-            return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-        }
+		// Fallback: nur Gilden (non-sqlite)
+		if ($driver !== 'sqlite') {
+			$st = $pdo->query("SELECT id, name, NULL AS server, NULL AS crest_file, NULL AS members_active, NULL AS last_import, NULL AS last_attack FROM guilds ORDER BY name");
+			return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+		}
 
-        $hasMembers = sf_sqlite_table_exists($pdo, 'members');
-        $hasBattles = sf_sqlite_table_exists($pdo, 'sf_eval_battles');
+		$hasMembers = sf_sqlite_table_exists($pdo, 'members');
+		$hasBattles = sf_sqlite_table_exists($pdo, 'sf_eval_battles');
 
-        $parts = [
-            "g.id",
-            "g.name",
-            "g.server",
-            "g.crest_file",
-            ($hasMembers ? "(
-                SELECT COUNT(*)
-                FROM members m
-                WHERE m.guild_id = g.id
-                  AND (m.left_at  IS NULL OR TRIM(m.left_at)  = '')
-                  AND (m.fired_at IS NULL OR TRIM(m.fired_at) = '')
-            ) AS members_active" : "NULL AS members_active"),
-            ($hasBattles ? "(
-                SELECT MAX(battle_date)
-                FROM sf_eval_battles b
-                WHERE b.guild_id = g.id
-            ) AS last_import" : "NULL AS last_import"),
-            ($hasBattles ? "(
-                SELECT MAX(battle_date)
-                FROM sf_eval_battles b
-                WHERE b.guild_id = g.id
-                  AND b.battle_type = 'attack'
-            ) AS last_attack" : "NULL AS last_attack"),
-        ];
+		$membersSql = $hasMembers ? "
+			(
+				SELECT COUNT(*)
+				FROM members m
+				WHERE m.guild_id = g.id
+				  AND (m.left_at  IS NULL OR TRIM(m.left_at)  = '')
+				  AND (m.fired_at IS NULL OR TRIM(m.fired_at) = '')
+			)
+		" : "NULL";
 
-        $sql = "SELECT " . implode(",\n", $parts) . "
-                FROM guilds g
-                ORDER BY g.name COLLATE NOCASE";
+		$lastImportSql = $hasBattles ? "
+			(
+				SELECT MAX(battle_date)
+				FROM sf_eval_battles b
+				WHERE b.guild_id = g.id
+			)
+		" : "NULL";
 
-        $st = $pdo->query($sql);
-        return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-    } catch (Throwable $e) {
-        return [];
-    }
+		$lastAttackSql = $hasBattles ? "
+			(
+				SELECT MAX(battle_date)
+				FROM sf_eval_battles b
+				WHERE b.guild_id = g.id
+				  AND b.battle_type = 'attack'
+			)
+		" : "NULL";
+
+		$sql = "
+			SELECT
+				g.id,
+				g.name,
+				g.server,
+				g.crest_file,
+				$membersSql   AS members_active,
+				$lastImportSql AS last_import,
+				$lastAttackSql AS last_attack
+			FROM guilds g
+			ORDER BY g.name COLLATE NOCASE
+		";
+
+		$st = $pdo->query($sql);
+		return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+	} catch (Throwable $e) {
+		return [];
+	}
 }
 
 function sf_ago_utc($ts): string
@@ -873,6 +884,9 @@ $inactiveCount = count($playersInactive);
 
           $name = (string)($g['name'] ?? '');
 
+          $crest = trim((string)($g['crest_file'] ?? ''));
+          $crestUrl = ($crest !== '') ? url('/uploads/crests/' . $crest) : '';
+
           $active = $g['members_active'] ?? null;
           $activeText = ($active === null || $active === '') ? '–' : (string)(int)$active;
 
@@ -884,7 +898,19 @@ $inactiveCount = count($playersInactive);
         ?>
 
         <div class="sf-card sf-guildtile">
-          <div class="sf-guildtile-title"><?= e($name) ?></div>
+          <div class="sf-guildtile-head">
+            <?php if ($crestUrl !== ''): ?>
+              <a href="<?= e($reportUrl) ?>" style="display:inline-flex;"><img
+                src="<?= e($crestUrl) ?>"
+                alt="Wappen"
+                class="sf-guildtile-crest"
+              ></a>
+            <?php else: ?>
+              <div class="sf-guildtile-crest sf-guildtile-crest--empty" aria-hidden="true"></div>
+            <?php endif; ?>
+
+            <div class="sf-guildtile-title"><?= e($name) ?></div>
+          </div>
 
           <div class="sf-guildtile-meta">
             <div>Letzter Import: <?= e($lastImport) ?></div>
@@ -917,6 +943,55 @@ $inactiveCount = count($playersInactive);
         gap:8px;
       }
       .sf-guildtile-actions{
+        display:flex;
+        gap:10px;
+        justify-content:flex-end;
+        margin-top:18px;
+      }
+        
+      .sf-cards{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(420px,1fr));
+        gap:18px;
+      }
+
+      .sf-cards .sf-card{
+        border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.03);
+        border-radius:18px;
+        padding:18px 20px;
+      }
+
+      .sf-card-head{
+        display:flex;
+        align-items:center;
+        gap:14px;
+        margin-bottom:10px;
+      }
+
+      .sf-crest{
+        height:54px;
+        width:54px;
+        border-radius:14px;
+        object-fit:cover;
+        border:1px solid rgba(255,255,255,.10);
+        flex:0 0 auto;
+        background:rgba(255,255,255,.02);
+      }
+
+      .sf-crest--empty{
+        background:rgba(255,255,255,.04);
+      }
+
+      .sf-cards .sf-card-title{
+        font-size:26px;
+        font-weight:800;
+        margin:0;
+      }
+
+      .sf-card-meta{ opacity:.9; }
+
+      .sf-card-actions{
         display:flex;
         gap:10px;
         justify-content:flex-end;
