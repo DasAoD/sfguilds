@@ -159,7 +159,15 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selectedDate) || substr($selectedDate,
 $filterGuildId = isset($_GET['g']) ? (int)$_GET['g'] : 0;
 
 // --- Gilden laden (für Anzeige + Dropdown)
-$allGuilds = $pdo->query("SELECT id, name FROM guilds ORDER BY name")->fetchAll();
+$allGuilds = $pdo->query("SELECT id, name, crest_file FROM guilds ORDER BY name")->fetchAll();
+
+// crest_url direkt vorbereiten (damit der View nur noch anzeigen muss)
+foreach ($allGuilds as &$g) {
+	$crest = trim((string)($g['crest_file'] ?? ''));
+	$g['crest_url'] = ($crest !== '') ? url('/uploads/crests/' . $crest) : '';
+}
+unset($g);
+
 $guilds = $allGuilds;
 
 if ($filterGuildId > 0) {
