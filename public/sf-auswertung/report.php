@@ -997,6 +997,37 @@ $inactiveCount = count($playersInactive);
         justify-content:flex-end;
         margin-top:18px;
       }
+
+      /* Header-Zeile in der Kachel: Wappen + Name */
+      .sf-guildtile-head{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        margin-bottom:12px;
+      }
+
+      /* Wappen selbst (kleiner!) */
+      .sf-guildtile-crest{
+        width:44px;
+        height:44px;
+        border-radius:12px;
+        object-fit:cover;
+        border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.02);
+        flex:0 0 auto;
+      }
+
+      .sf-guildtile-crest--empty{
+        background:rgba(255,255,255,.04);
+      }
+
+      /* Titel in der Head-Zeile: ohne extra Abstand nach unten */
+      .sf-guildtile-title{
+        font-size:24px;
+        font-weight:800;
+        margin:0;
+        line-height:1.1;
+      }
     </style>
 
   <?php else: ?>
