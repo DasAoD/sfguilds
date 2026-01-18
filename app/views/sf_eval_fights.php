@@ -27,6 +27,20 @@
 	}
 	.guild-card h3 { margin: 0; }
 	.guild-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+	.guild-crest-mini{
+		width:24px;
+		height:24px;
+		border-radius:8px;
+		object-fit:cover;
+		border:1px solid rgba(255,255,255,0.10);
+		background: rgba(255,255,255,0.02);
+		flex:0 0 auto;
+	}
+	.guild-crest-mini--empty{
+		display:inline-block;
+		background: rgba(255,255,255,0.05);
+	}
 </style>
 
 <h2>Kämpfe – Monatsübersicht</h2>
@@ -69,6 +83,7 @@ $fmtDateDe = static function(string $ymd): string {
 			<?php
 				$gid = (int)$g['id'];
 				$name = (string)$g['name'];
+				$crestUrl = (string)($g['crest_url'] ?? '');
 
 				$tot = $monthTotalsByGuild[$gid] ?? ['a'=>0,'d'=>0,'t'=>0];
 
@@ -81,8 +96,14 @@ $fmtDateDe = static function(string $ymd): string {
 				<div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
 					<div class="guild-actions">
 						<h3>
-							<a href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>&g=<?= (int)$gid ?>#g<?= (int)$gid ?>" style="text-decoration:none;">
-								<?= $e($name) ?>
+							<a href="?m=<?= htmlspecialchars($monthKey, ENT_QUOTES, 'UTF-8') ?>&g=<?= (int)$gid ?>#g<?= (int)$gid ?>"
+	  						 style="text-decoration:none; display:inline-flex; align-items:center; gap:10px;">
+								<?php if ($crestUrl !== ''): ?>
+									<img src="<?= $e($crestUrl) ?>" alt="Wappen" class="guild-crest-mini">
+								<?php else: ?>
+									<span class="guild-crest-mini guild-crest-mini--empty" aria-hidden="true"></span>
+								<?php endif; ?>
+								<span><?= $e($name) ?></span>
 							</a>
 						</h3>
 
